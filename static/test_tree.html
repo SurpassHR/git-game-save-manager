@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/@gitgraph/js"></script>
+</head>
+
+<body>
+  <div id="graph-container"></div>
+  <script type="text/javascript">
+    var commitInfo = [
+      {
+        "hash": "eafe9ae3",
+        "commitMsg": "STATE: 分支说明",
+        "author": "SurpassHR",
+        "childCommit": [],
+        "parentCommit": [
+          "49f72a87"
+        ],
+        "createDate": "2025-05-04 03:14:00",
+        "branches": [
+          "new_branch"
+        ]
+      },
+      {
+        "hash": "49f72a87",
+        "commitMsg": "STATE: 分支说明",
+        "author": "SurpassHR",
+        "childCommit": [
+          "eafe9ae3"
+        ],
+        "parentCommit": [
+          "dea15880"
+        ],
+        "createDate": "2025-05-04 03:13:42",
+        "branches": [
+          "new_branch"
+        ]
+      },
+      {
+        "hash": "dea15880",
+        "commitMsg": "DECISION: asd",
+        "author": "SurpassHR",
+        "childCommit": [
+          "49f72a87"
+        ],
+        "parentCommit": [
+          "c190cd26"
+        ],
+        "createDate": "2025-05-04 03:05:08",
+        "branches": [
+          "new_branch"
+        ]
+      },
+      {
+        "hash": "c190cd26",
+        "commitMsg": "STATE: 分支说明",
+        "author": "SurpassHR",
+        "childCommit": [
+          "dea15880"
+        ],
+        "parentCommit": [
+          "acb92320"
+        ],
+        "createDate": "2025-05-04 03:05:01",
+        "branches": [
+          "new_branch"
+        ]
+      },
+      {
+        "hash": "acb92320",
+        "commitMsg": "STATE: 分支说明",
+        "author": "SurpassHR",
+        "childCommit": [
+          "c190cd26"
+        ],
+        "parentCommit": [
+          "d39ff3ff"
+        ],
+        "createDate": "2025-05-04 03:04:16",
+        "branches": [
+          "go_to_north",
+          "new_branch"
+        ]
+      },
+      {
+        "hash": "11b78063",
+        "commitMsg": "Missing Marie告知实情",
+        "author": "SurpassHR",
+        "childCommit": [],
+        "parentCommit": [
+          "d39ff3ff"
+        ],
+        "createDate": "2025-05-03 22:20:02",
+        "branches": [
+          "tell_the_truth"
+        ]
+      },
+      {
+        "hash": "fb39fceb",
+        "commitMsg": "Missing Marie不告知实情",
+        "author": "SurpassHR",
+        "childCommit": [],
+        "parentCommit": [
+          "d39ff3ff"
+        ],
+        "createDate": "2025-05-03 22:19:01",
+        "branches": [
+          "not_to_tell_the_truth"
+        ]
+      },
+      {
+        "hash": "d39ff3ff",
+        "commitMsg": "[fork]Missing Marie是否告知实情",
+        "author": "SurpassHR",
+        "childCommit": [
+          "acb92320",
+          "11b78063",
+          "fb39fceb"
+        ],
+        "parentCommit": [
+          "3accef89"
+        ],
+        "createDate": "2025-05-03 22:16:50",
+        "branches": [
+          "go_to_north",
+          "new_branch",
+          "not_to_tell_the_truth",
+          "tell_the_truth"
+        ]
+      },
+      {
+        "hash": "3accef89",
+        "commitMsg": "[fork]如何进入Hookton Village",
+        "author": "SurpassHR",
+        "childCommit": [
+          "d39ff3ff"
+        ],
+        "parentCommit": [
+          "dc303f02"
+        ],
+        "createDate": "2025-05-03 22:12:18",
+        "branches": [
+          "go_to_north",
+          "new_branch",
+          "not_to_tell_the_truth",
+          "tell_the_truth"
+        ]
+      },
+      {
+        "hash": "dc303f02",
+        "commitMsg": "main process",
+        "author": "SurpassHR",
+        "childCommit": [
+          "3accef89"
+        ],
+        "parentCommit": [],
+        "createDate": "2025-05-03 22:04:14",
+        "branches": [
+          "go_to_north",
+          "go_to_south",
+          "master",
+          "new_branch",
+          "not_to_tell_the_truth",
+          "tell_the_truth"
+        ]
+      }
+    ]
+    const graphContainer = document.getElementById("graph-container");
+    const gitgraph = GitgraphJS.createGitgraph(graphContainer, {
+      orientation: "vertical-reverse"
+    });
+
+    function getFirstCommit(commitInfo) {
+      var firstCommitHash = '';
+      commitInfo.forEach(commit => {
+        if (commit.parentCommit.length === 0) {
+          firstCommitHash = commit.hash;
+        }
+      });
+      return firstCommitHash;
+    }
+
+    function getCommitByHash(commitInfo, commitHash) {
+      var targetCommit = undefined;
+      commitInfo.forEach(commit => {
+        if (commit.hash === commitHash) {
+          targetCommit = commit;
+        }
+      })
+      return targetCommit;
+    }
+
+    function getNextCommit(commitInfo, commit) {
+      var targetCommit = undefined;
+      var nextCommitHashList = commit.childCommit;
+      var nextCommitList = []
+      console.log(nextCommitHashList);
+      nextCommitHashList.forEach(childCommitHash => {
+        var nextCommit = getCommitByHash(commitInfo, childCommitHash);
+        if (nextCommit) {
+          nextCommitList.push(nextCommit);
+        }
+      })
+      return nextCommitList;
+    }
+
+    var firstCommitHash = getFirstCommit(commitInfo);
+    var firstCommit = getCommitByHash(commitInfo, firstCommitHash);
+    var currCommit = firstCommit;
+    var nextCommitList = getNextCommit(commitInfo, firstCommit);
+    var nextCommit = undefined;
+
+    // 构建提交映射表和分支映射表
+    const commitMap = {};
+    const branchMap = {};
+    commitInfo.forEach(commit => {
+      commitMap[commit.hash] = commit;
+    });
+
+    // 按时间排序提交
+    const sortedCommits = [...commitInfo].sort((a, b) =>
+      new Date(a.createDate) - new Date(b.createDate)
+    );
+
+    // 初始化master分支
+    const master = gitgraph.branch('master');
+    branchMap['master'] = master;
+
+    // 处理每个提交
+    sortedCommits.forEach(commit => {
+      // 找到或创建对应的分支
+      let targetBranch = null;
+      for (const branchName of commit.branches) {
+        if (branchMap[branchName]) {
+          targetBranch = branchMap[branchName];
+          break;
+        }
+      }
+
+      // 如果没有找到现有分支，创建新分支
+      if (!targetBranch) {
+        const parentCommit = commit.parentCommit[0];
+        if (parentCommit && commitMap[parentCommit]) {
+          const parentBranchName = commitMap[parentCommit].branches[0];
+          if (branchMap[parentBranchName]) {
+            targetBranch = branchMap[parentBranchName].branch(commit.branches[0]);
+            branchMap[commit.branches[0]] = targetBranch;
+          }
+        }
+      }
+
+      // 如果仍然没有分支，使用master
+      if (!targetBranch) {
+        targetBranch = master;
+      }
+
+      // 创建提交
+      targetBranch.commit({
+        hash: commit.hash,
+        subject: commit.commitMsg,
+        author: commit.author,
+        timestamp: new Date(commit.createDate)
+      });
+
+      // 更新分支映射
+      commit.branches.forEach(branchName => {
+        if (!branchMap[branchName]) {
+          branchMap[branchName] = targetBranch;
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
