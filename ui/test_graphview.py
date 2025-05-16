@@ -73,7 +73,7 @@ class MyMainWindow(FluentWindow):
     APP_HEIGHT = 720
     THEME_COLOR = "#8A95A9"
 
-    def __init__(self) -> None:
+    def __init__(self, sth) -> None:
         super().__init__()
 
         self.setWindowTitle("PyQt5 GraphicsView Test")
@@ -81,7 +81,12 @@ class MyMainWindow(FluentWindow):
 
         setThemeColor(self.THEME_COLOR)
 
+        # 隐藏标题栏图标
         self.titleBar.iconLabel.hide()
+
+        # 隐藏导航栏
+        self.navigationInterface.hide()
+
         # 设置启动位置
         desktop = QApplication.desktop()
         if desktop:
@@ -102,5 +107,5 @@ if __name__ == '__main__':
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
 
     app = QApplication(sys.argv)
-    mainWindow = MyMainWindow()
+    mainWindow = MyMainWindow(None)
     app.exec()

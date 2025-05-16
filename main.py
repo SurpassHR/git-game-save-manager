@@ -1,12 +1,19 @@
 import sys
 from core.gitManager import GitManager
-from ui.main_window import MainWindow
+from ui.test_graphview import MyMainWindow
+
 from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import Qt
+
 
 def main():
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling)
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
+
     app = QApplication(sys.argv)
     git_manager = GitManager("./saves")  # 默认存档目录
-    window = MainWindow(git_manager)
+    window = MyMainWindow(git_manager)
     window.show()
     sys.exit(app.exec_())
 
