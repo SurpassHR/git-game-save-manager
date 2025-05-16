@@ -1,0 +1,151 @@
+import sys
+
+from typing import Optional
+from enum import IntEnum
+from collections.abc import Callable
+
+from PyQt5.QtCore import (
+    QObject,
+    pyqtSignal,
+    pyqtSlot,
+    QRunnable,
+    QThreadPool,
+)
+from PyQt5.QtWidgets import QWidget
+
+from qfluentwidgets.components.dialog_box import MessageBox
+
+from core.tools.publicDef.levelDefs import MsgBoxLevels
+from core.tools.utils.simpleLogger import loggerPrint
+from core.tools.publicDef.levelDefs import LogLevels
+
+
+class EventFuncType(IntEnum):
+    UI_DRAWING_EVENT = 1 # UI 绘制相关事件，不能在子线程中执行
+    TIME_CONSUMING_EVENT = 2 # 耗时操作相关事件，可以在子线程中执行
+
+
+class EventEnum(IntEnum):
+    GUI_GOTO_MAIN_PAGE = 0x01
+    GUI_GOTO_INFO_PAGE = 0x02
+
+
+    MAIN_PAGE_FETCH_PROC_DATA = 0x10
+    MAIN_PAGE_FETCH_PROC_DATA_FINISH = 0x11
+
+
+    INFO_PAGE_REFRESH_TABLE_DATA = 0x20
+
+    INFO_PAGE_EXPORT_TABLE_DATA = 0x30
+    INFO_PAGE_EXPORT_TABLE_DATA_FINISH = 0x31
+
+    INFO_PAGE_ADD_TABLE_DATA_TO_FILE = 0x40
+    INFO_PAGE_ADD_TABLE_DATA_TO_FILE_FINISH = 0x41
+
+
+class EventTask(QRunnable):
+    def __init__(self, handler: Callable, event: EventEnum, data: dict):
+        super().__init__()
+        self.handler = handler
+        self.event = event
+        self.data = data
+
+    def run(self):
+        try:
+            self.handler(self.event, self.data)
+        except Exception as e:
+            EventManager.getSingleton().emitError(
+                sys.exc_info()[2].tb_frame.f_code.co_filename,  # type: ignore
+                str(sys.exc_info()[2].tb_lineno),  # type: ignore
+                str(e),
+            )
+
+
+class EventManager(QObject):
+    # 单一实例
+    _singleton = None
+
+    # 自定义信号
+    # 字典类型或者其他复杂对象应该使用 object 作为信号参数类型，这样可以传递任意 Python 对象，包括 dict
+    _signal = pyqtSignal(int, object)
+
+    # 事件列表
+    _eventCallbacks: dict[EventEnum, dict[Callable, EventFuncType]] = {}
+
+    # 错误事件在这里统一处理（完全不处理，直接弹框提示到对应位置修改问题，只要保证例外出现时不会导致 UI 进程挂掉）
+    _errorSignal = pyqtSignal(str, str, str)
+
+    # 消息框事件
+    _msgBoxSignal = pyqtSignal(MsgBoxLevels, str, object, object)
+
+    # 主窗口
+    _mainWindow: Optional[QWidget] = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._signal.connect(self.processEvent)
+        self._errorSignal.connect(self.processError)
+        self._msgBoxSignal.connect(self.processMsgBox)
+
+    # 获取单例
+    @staticmethod
+    def getSingleton():
+        if EventManager._singleton == None:
+            EventManager._singleton = EventManager()
+
+        return EventManager._singleton
+
+    # 处理事件
+    def processEvent(self, event: EventEnum, data: dict):
+        if event in self._eventCallbacks:
+            for handler, evtFuncType in self._eventCallbacks[event].items():
+                if evtFuncType == EventFuncType.TIME_CONSUMING_EVENT:
+                    task = EventTask(handler, event, data)
+                    QThreadPool.globalInstance().start(task)  # type: ignore
+                else:
+                    handler(event, data)
+
+    @pyqtSlot(MsgBoxLevels, str, object, object)
+    def processMsgBox(self, level: MsgBoxLevels, msg: str, acptCbk: Optional[Callable] = None, rejtCbk: Optional[Callable] = None):
+        # 类型转换和检查
+        if not isinstance(level, MsgBoxLevels):
+            return
+        msgBox = MessageBox(title=level.value, content=msg, parent=self._mainWindow)
+        msgBox.yesButton.setText("确定")
+        msgBox.cancelButton.setText("取消")
+        if callable(acptCbk):
+            msgBox.accepted.connect(acptCbk)
+        if callable(rejtCbk):
+            msgBox.rejected.connect(rejtCbk)
+        msgBox.exec()
+
+    def showMsgBox(self, level: MsgBoxLevels, msg: str, acptCbk: Optional[Callable] = None, rejtCbk: Optional[Callable] = None) -> None:
+        self._msgBoxSignal.emit(level, msg, acptCbk, rejtCbk)
+
+    @pyqtSlot(str, str, str)
+    def processError(self, filename: str, lineno: str, error: str):
+        msg = f"{filename}:{lineno} - ERROR: {error}"
+        loggerPrint(msg, level=LogLevels.ERROR)
+        self.showMsgBox(
+            level=MsgBoxLevels.ERROR,
+            msg=msg,
+            acptCbk=None,
+        )
+
+    def emitError(self, filename: str, lineno: str, error: str):
+        self._errorSignal.emit(filename, lineno, error)
+
+    # 触发事件
+    def emit(self, event: EventEnum, data: dict):
+        self._signal.emit(event, data)
+
+    # 订阅事件
+    def subscribe(self, event: EventEnum, handler: Callable, evtFuncType: EventFuncType):
+        if event not in self._eventCallbacks:
+            self._eventCallbacks[event] = {}
+        self._eventCallbacks[event][handler] = evtFuncType
+
+    # 取消订阅事件
+    def unsubscribe(self, event: EventEnum, handler: Callable):
+        if event in self._eventCallbacks:
+            self._eventCallbacks[event].pop(handler)

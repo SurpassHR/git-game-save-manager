@@ -6,7 +6,7 @@ class InfiniteCanvasView(QGraphicsView):
     def __init__(self, scene, parent=None):
         super().__init__(parent)
         self.setScene(scene)
-        self.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        self.setRenderHints(QPainter.RenderHint(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform))
 
         # 视图控制参数
         self._pan_start = QPoint()
@@ -16,6 +16,14 @@ class InfiniteCanvasView(QGraphicsView):
         # 强制显示滚动条（视觉上更一致）
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setStyleSheet("""
+            QGraphicsView {
+                border: none;
+                border-radius: 10px;
+                padding: 0;
+                margin: 0;
+            }
+        """)
 
         # 初始场景范围
         scene = self.scene()

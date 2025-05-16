@@ -1,10 +1,10 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QGraphicsItem, QVBoxLayout, QFrame
+from PyQt5.QtWidgets import QApplication, QGraphicsItem, QVBoxLayout, QHBoxLayout, QFrame, QBoxLayout
 from PyQt5.QtGui import QBrush, QPen
 from PyQt5.QtCore import Qt
 from pathlib import Path
 
-from qfluentwidgets import FluentWindow, NavigationItemPosition
+from qfluentwidgets import FluentWindow, NavigationItemPosition, PrimaryPushButton
 from qfluentwidgets.common.style_sheet import setThemeColor
 from qfluentwidgets.common.icon import FluentIcon
 
@@ -25,29 +25,48 @@ class MainPage(QFrame):
         self.createUI()
 
     def createUI(self):
-        viewContainer = QVBoxLayout()
+        container = QVBoxLayout()
 
-        scene = SmartGridScene(self)
+        def addCtrlBtn(container: QBoxLayout):
+            btnContainer = QHBoxLayout()
 
-        # greenBrush = QBrush(Qt.GlobalColor.green)
-        blueBrush = QBrush(Qt.GlobalColor.blue)
+            btn1 = PrimaryPushButton()
 
-        blackPen = QPen(Qt.GlobalColor.black)
-        blackPen.setWidth(5)
+            btn2 = PrimaryPushButton()
 
-        rect = scene.addEllipse(-100, -100, 200, 200, blackPen, blueBrush)
-        if not rect:
-            return
-        rect.setBrush(blueBrush)
-        rect.setPen(blackPen)
-        rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-        # rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+            btn3 = PrimaryPushButton()
 
-        view = InfiniteCanvasView(scene, self)
-        view.setGeometry(0, 0, 1280, 720)
+            btnContainer.addWidget(btn1, 1)
+            btnContainer.addWidget(btn2, 1)
+            btnContainer.addWidget(btn3, 1)
 
-        viewContainer.addWidget(view)
-        self.setLayout(viewContainer)
+            container.addLayout(btnContainer)
+
+        def addScene(container: QBoxLayout):
+            scene = SmartGridScene(self)
+
+            # greenBrush = QBrush(Qt.GlobalColor.green)
+            blueBrush = QBrush(Qt.GlobalColor.blue)
+
+            blackPen = QPen(Qt.GlobalColor.black)
+            blackPen.setWidth(5)
+
+            rect = scene.addEllipse(-100, -100, 200, 200, blackPen, blueBrush)
+            if not rect:
+                return
+            rect.setBrush(blueBrush)
+            rect.setPen(blackPen)
+            rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+            # rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+
+            view = InfiniteCanvasView(scene, self)
+            view.setGeometry(0, 0, 1280, 720)
+
+            container.addWidget(view)
+
+        addCtrlBtn(container)
+        addScene(container)
+        self.setLayout(container)
 
 class MyMainWindow(FluentWindow):
     APP_WIDTH = 1280
@@ -74,34 +93,8 @@ class MyMainWindow(FluentWindow):
         self._mainPage = MainPage("_mainPage", self)
         self.addSubInterface(self._mainPage, FluentIcon.SETTING, "配置执行", NavigationItemPosition.SCROLL)
 
-        # self.createUI()
-
         self.show()
 
-    def createUI(self):
-        viewContainer = QVBoxLayout()
-
-        scene = SmartGridScene(self)
-
-        # greenBrush = QBrush(Qt.GlobalColor.green)
-        blueBrush = QBrush(Qt.GlobalColor.blue)
-
-        blackPen = QPen(Qt.GlobalColor.black)
-        blackPen.setWidth(5)
-
-        rect = scene.addEllipse(-100, -100, 200, 200, blackPen, blueBrush)
-        if not rect:
-            return
-        rect.setBrush(blueBrush)
-        rect.setPen(blackPen)
-        rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-        # rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
-
-        view = InfiniteCanvasView(scene, self)
-        view.setGeometry(0, 0, 1280, 720)
-
-        viewContainer.addWidget(view)
-        self.setLayout(viewContainer)
 
 if __name__ == '__main__':
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
