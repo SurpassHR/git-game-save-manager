@@ -7,9 +7,9 @@ from pathlib import Path
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
-from ui.components.graphicManager import GraphicManager
+from ui.components.graphicManager import NodeManager
 
-class GridScene(QGraphicsScene, GraphicManager):
+class GridScene(QGraphicsScene, NodeManager):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.grid_size = 20  # 网格基础大小（像素）

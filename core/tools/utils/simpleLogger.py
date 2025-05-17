@@ -50,7 +50,7 @@ def _formatFilePath(fileName: str, lineNo: int) -> str:
     filePath = os.path.relpath(fileName, ROOT_DIR)
     lineNoStr: str = str(lineNo)
     fileContext: str = f'{filePath}:{lineNoStr}'
-    fileContext: str = f'{fileContext:30}'
+    fileContext: str = f'{fileContext:50}'
 
     return fileContext
 
@@ -89,7 +89,7 @@ def _printFormatted(msg, level, frame):
 
 def loggerPrintList(dataList: list) -> None:
     if not isinstance(dataList, list):
-        loggerPrint(f"Not a list.", frame=inspect.stack()[1], level=LogLevels.WARNING)
+        loggerPrint("Not a list.", frame=inspect.stack()[1], level=LogLevels.WARNING)
         return
     if dataList is not None and dataList != []:
         for item in dataList:
@@ -101,7 +101,7 @@ def loggerPrintList(dataList: list) -> None:
 
 def loggerPrintDict(dataDict: dict) -> None:
     if not isinstance(dataDict, dict):
-        loggerPrint(f"Not a dict.", frame=inspect.stack()[1], level=LogLevels.WARNING)
+        loggerPrint("Not a dict.", frame=inspect.stack()[1], level=LogLevels.WARNING)
         return
     if dataDict is not None and dataDict != {}:
         for key, value in dataDict.items():

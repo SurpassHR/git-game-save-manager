@@ -1,5 +1,6 @@
 from enum import StrEnum, IntEnum
 
+
 class ANSIColors(StrEnum):
     COLOR_RESET             = "[default]"
     COLOR_BRIGHT_RED        = "[bright_red]"
