@@ -7,11 +7,14 @@ from pathlib import Path
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
-class GridScene(QGraphicsScene):
+from ui.components.graphicManager import GraphicManager
+
+class GridScene(QGraphicsScene, GraphicManager):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.grid_size = 20  # 网格基础大小（像素）
         self.grid_color = QColor(220, 220, 220)  # 浅灰色网格
+        self.boundToScene(self)
 
     def drawBackground(self, painter, rect):
         """ 重写背景绘制方法 """
@@ -35,7 +38,11 @@ class GridScene(QGraphicsScene):
             painter.drawLine(int(rect.left()), y, int(rect.right()), y)
             y += self.grid_size
 
+
 class SmartGridScene(GridScene):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
     def drawBackground(self, painter, rect):
         # 根据视图缩放级别动态调整网格密度
         views = self.views()

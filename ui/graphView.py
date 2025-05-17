@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QGraphicsItem, QVBoxLayout, QHBoxLayout, QFrame, QBoxLayout
+from PyQt5.QtWidgets import QApplication, QVBoxLayout, QHBoxLayout, QFrame, QBoxLayout
 from PyQt5.QtGui import QBrush, QPen
 from PyQt5.QtCore import Qt
 from pathlib import Path
@@ -30,15 +30,12 @@ class MainPage(QFrame):
         def addCtrlBtn(container: QBoxLayout):
             btnContainer = QHBoxLayout()
 
-            btn1 = PrimaryPushButton()
+            btn1 = PrimaryPushButton("增加节点")
 
-            btn2 = PrimaryPushButton()
-
-            btn3 = PrimaryPushButton()
+            btn2 = PrimaryPushButton("删除节点")
 
             btnContainer.addWidget(btn1, 1)
             btnContainer.addWidget(btn2, 1)
-            btnContainer.addWidget(btn3, 1)
 
             container.addLayout(btnContainer)
 
@@ -51,12 +48,23 @@ class MainPage(QFrame):
             blackPen = QPen(Qt.GlobalColor.black)
             blackPen.setWidth(5)
 
-            rect = scene.addEllipse(-100, -100, 200, 200, blackPen, blueBrush)
-            if not rect:
-                return
-            rect.setBrush(blueBrush)
-            rect.setPen(blackPen)
-            rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+            scene.createDragableRound(
+                x=-100,
+                y=-100,
+                r=200,
+                border=blackPen,
+                fill=blueBrush,
+                id="test1",
+            )
+            scene.createDragableRound(
+                x=-50,
+                y=-50,
+                r=100,
+                border="#eff",
+                fill="c00",
+                id="test2",
+            )
+
             # rect.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
             view = InfiniteCanvasView(scene, self)

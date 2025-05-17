@@ -1,6 +1,6 @@
 import sys
 from core.gitManager import GitManager
-from ui.test_graphview import MyMainWindow
+from ui.graphView import MyMainWindow
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt

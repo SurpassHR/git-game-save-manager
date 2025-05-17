@@ -1,9 +1,16 @@
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsItem
+import sys
+from pathlib import Path
+from PyQt5.QtWidgets import QGraphicsView, QGraphicsItem, QGraphicsScene
 from PyQt5.QtGui import QPainter
 from PyQt5.QtCore import Qt, QRectF, QPoint
 
+rootPath = str(Path(__file__).resolve().parent.parent.parent)
+sys.path.append(rootPath)
+
+from ui.components.gridScene import SmartGridScene
+
 class InfiniteCanvasView(QGraphicsView):
-    def __init__(self, scene, parent=None):
+    def __init__(self, scene: QGraphicsScene, parent=None):
         super().__init__(parent)
         self.setScene(scene)
         self.setRenderHints(QPainter.RenderHint(QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform))
@@ -26,7 +33,6 @@ class InfiniteCanvasView(QGraphicsView):
         """)
 
         # 初始场景范围
-        scene = self.scene()
         if not scene:
             return
         scene.setSceneRect(QRectF(-1e6, -1e6, 2e6, 2e6))
@@ -58,6 +64,12 @@ class InfiniteCanvasView(QGraphicsView):
                 self._panning = True
                 self._pan_start = event.pos()
                 self.setCursor(Qt.CursorShape.ClosedHandCursor)
+                scene = self.scene()
+                if not scene:
+                    return
+                if isinstance(scene, SmartGridScene):
+                    scene.clearAllSelectedGraphic()
+                    scene.clearSelection()
                 event.accept()
 
     def mouseMoveEvent(self, event):

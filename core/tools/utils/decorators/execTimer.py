@@ -1,6 +1,6 @@
 import time
 from functools import wraps
-from src.tools.utils.simpleLogger import loggerPrint, LogLevels
+from core.tools.utils.simpleLogger import loggerPrint, LogLevels
 
 def timer(func):
     @wraps(func)
