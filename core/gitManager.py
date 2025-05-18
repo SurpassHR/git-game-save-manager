@@ -71,14 +71,29 @@ class GitManager:
         if not self.repo:
             return {"nodes": [], "links": []}
 
-        # 读取分支关系数据
+        # 获取所有本地分支及其上游分支关系
         branch_relations = {}
+
+        # 1. 首先读取自定义的分支关系文件(保持向后兼容)
         branch_file = os.path.join(self.repo_path, ".git/branches")
         if os.path.exists(branch_file):
             with open(branch_file, "r") as f:
                 for line in f.readlines():
                     branch, _, parent = line.strip().split()
                     branch_relations[branch] = parent
+
+        # 2. 获取所有本地分支信息
+        for branch in self.repo.heads:
+            branch_name = branch.name
+            # 如果分支未在关系文件中记录，则添加默认关系
+            if branch_name not in branch_relations:
+                # 获取分支的上游分支(如果有)
+                tracking_branch = branch.tracking_branch()
+                if tracking_branch:
+                    branch_relations[branch_name] = tracking_branch.name
+                else:
+                    # 没有上游分支则指向分支创建时的父commit
+                    branch_relations[branch_name] = branch.commit.hexsha
 
         # 获取git log的图形输出
         git_log = self.repo.git.log(
@@ -92,9 +107,10 @@ class GitManager:
         # 解析git log输出
         nodes = []
         links = []
-        commit_cache = {}
+        commit_cache = {}  # 存储commit信息: {hash: {"id": hash, ...}}
         branch_heads = {}
 
+        # 第一遍遍历：收集所有commit信息
         for line in git_log.split('\n'):
             if not line.strip().startswith('*'):
                 continue
@@ -105,37 +121,38 @@ class GitManager:
             date = parts[2]
             parent_hashes = parts[3].split()
 
-            nodes.append({
+            commit_data = {
                 "id": commit_hash,
                 "name": commit_hash[:7],
                 "message": message,
                 "date": date,
-                "type": "decision" if "DECISION" in message else "branch" if "BRANCH" in message else "normal"
-            })
+                "type": "decision" if "DECISION" in message else "branch" if "BRANCH" in message else "normal",
+                "parents": parent_hashes
+            }
+
+            nodes.append(commit_data)
+            commit_cache[commit_hash] = commit_data
 
             # 记录分支头指针
             if message.startswith("BRANCH:"):
                 branch_name = message.split(":")[1].strip()
                 branch_heads[branch_name] = commit_hash
 
-            # 建立父子关系
-            for parent_hash in parent_hashes:
+        # 第二遍遍历：建立父子关系
+        for commit in nodes:
+            for parent_hash in commit["parents"]:
                 if parent_hash in commit_cache:
                     links.append({
-                        "source": commit_hash,
-                        "target": parent_hash,
-                        "type": "parent"
+                        "from": parent_hash,
+                        "to": commit["id"],
                     })
-
-            commit_cache[commit_hash] = True
 
         # 添加分支关系链接
         for branch, parent in branch_relations.items():
             if branch in branch_heads and parent in branch_heads:
                 links.append({
-                    "source": branch_heads[branch],
-                    "target": branch_heads[parent],
-                    "type": "branch"
+                    "from": branch_heads[parent],
+                    "to": branch_heads[branch],
                 })
 
         return {
@@ -154,3 +171,7 @@ if __name__ == '__main__':
     branches = data.get('branches', [])
     for node in nodes:
         print(node)
+    for link in links:
+        print(link)
+    # for branch in branches:
+    #     print(branch)

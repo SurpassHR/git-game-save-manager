@@ -8,21 +8,25 @@ rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
 from core.tools.utils.simpleLogger import loggerPrint
+from core.getGitInfo import CommitObj
 
 
-class RoundNodeGrphic(QGraphicsEllipseItem):
-    def __init__(self, rect: QRectF, selectCb: Callable, id: str, parentId: Optional[str]):
+class RoundNodeGrphic(QGraphicsEllipseItem, CommitObj):
+    def __init__(self, rect: QRectF, selectCb: Callable, level: int):
         super().__init__(rect)
 
         self.selectCb: Callable = selectCb
-        self.id: str = id
-        self.parentId: Optional[str] = parentId
+        self.level = level # 表示从根节点到本节点的距离
+
+    def setCommitInfo(self, commitObj: CommitObj):
+        for k, v in commitObj.__dict__.items():
+            self.setItem(k, v)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
 
         if self.isSelected() and self.selectCb:
-            self.selectCb(self.id, True)
+            self.selectCb(self.hexSha, True)
         if not event:
             return
         self.posBeforeMove = self.scenePos()
@@ -32,10 +36,10 @@ class RoundNodeGrphic(QGraphicsEllipseItem):
 
         if not event:
             return
-        loggerPrint(f"move {self.id}: {self.posBeforeMove} -> {self.scenePos()}, parent: {self.parentItem()}")
+        loggerPrint(f"move {self.hexSha}: {self.posBeforeMove} -> {self.scenePos()}, parent: {self.parentItem()}")
 
     def setSelected(self, selected: bool) -> None:
         super().setSelected(selected)
 
         if self.selectCb:
-            self.selectCb(self.id, selected)
+            self.selectCb(self.hexSha, selected)
