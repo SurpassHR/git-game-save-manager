@@ -26,7 +26,8 @@ class EventFuncType(IntEnum):
 
 
 class EventEnum(IntEnum):
-    pass
+    EVENT_INVALID = 0
+    GRAPHIC_MANAGER_ARRANGE_NODE = 1 # 图形管理整理节点图形
 
 
 class EventTask(QRunnable):
@@ -76,7 +77,7 @@ class EventManager(QObject):
     # 获取单例
     @staticmethod
     def getSingleton():
-        if EventManager._singleton == None:
+        if EventManager._singleton is None:
             EventManager._singleton = EventManager()
 
         return EventManager._singleton

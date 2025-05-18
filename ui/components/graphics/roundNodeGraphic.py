@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QGraphicsEllipseItem
 from PyQt5.QtCore import QRectF
-from typing import Callable, Optional
+from typing import Callable
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)

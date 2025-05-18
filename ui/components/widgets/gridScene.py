@@ -7,7 +7,7 @@ from pathlib import Path
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
-from ui.components.graphicManager import NodeManager
+from ui.components.utils.graphicManager import NodeManager
 
 class GridScene(NodeManager, QGraphicsScene):
     def __init__(self, parent=None):

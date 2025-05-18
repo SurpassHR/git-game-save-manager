@@ -11,9 +11,10 @@ rootPath = str(Path(__file__).resolve().parent.parent)
 sys.path.append(rootPath)
 
 from ui.components.pages.mainPage import MainPage
+from ui.components.utils.uiFunctionBase import UIFunctionBase
 
 
-class MainWindow(FluentWindow):
+class MainWindow(FluentWindow, UIFunctionBase):
     APP_WIDTH = 1280
     APP_HEIGHT = 720
     THEME_COLOR = "#8A95A9"
@@ -44,6 +45,8 @@ class MainWindow(FluentWindow):
         self._mainPage = MainPage("_mainPage", self)
         self._mainPage.git_manager = git_manager
         self.addSubInterface(self._mainPage, FluentIcon.SETTING, "配置执行", NavigationItemPosition.SCROLL)
+
+        self.uiSetMainWindow(self)
 
         self.show()
 

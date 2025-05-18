@@ -6,18 +6,19 @@ from pathlib import Path
 from qfluentwidgets import PrimaryPushButton
 from qfluentwidgets.common.icon import FluentIcon
 
+from ui.components.utils.eventManager import EventEnum
+
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
-from core.tools.utils.dataStructTools import listDedup
-from core.tools.utils.simpleLogger import loggerPrint
 from core.getGitInfo import CommitObj
+from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.components.widgets.infiniteCanvasView import InfiniteCanvasView
 from ui.components.widgets.gridScene import SmartGridScene
-from ui.tools.styleDefs import NODE_VERTICAL_SPACING
+from ui.publicDefs.styleDefs import NODE_VERTICAL_SPACING
 
 
-class MainPage(QFrame):
+class MainPage(QFrame, UIFunctionBase):
     def __init__(self, text: str, window) -> None:
         QFrame.__init__(self, window)
 
@@ -63,6 +64,7 @@ class MainPage(QFrame):
                 text="整理节点",
                 icon=FluentIcon.ROTATE,
             )
+            btn3.clicked.connect(lambda: self.uiEmit(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODE, {}))
 
             btnContainer.addWidget(btn1, 1)
             btnContainer.addWidget(btn2, 1)

@@ -1,11 +1,8 @@
-from csv import Error
 import sys
 from pathlib import Path
-from tkinter import Y
-from turtle import width
 from PyQt5.QtGui import QPen, QColor, QBrush
 from PyQt5.QtWidgets import QGraphicsItem, QGraphicsScene
-from PyQt5.QtCore import QRectF, QPointF, QSizeF
+from PyQt5.QtCore import QRectF, QPointF, QSizeF, pyqtSignal
 from typing import Optional
 
 from core.tools.publicDef.levelDefs import LogLevels
@@ -19,15 +16,19 @@ from core.tools.utils.simpleLogger import loggerPrint
 
 from ui.components.graphics.roundNodeGraphic import RoundNodeGrphic
 from ui.components.graphics.connectionLineGraphic import ConnectionLineGraphic
-from ui.tools.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING
+from ui.components.utils.eventManager import EventEnum, EventFuncType
+from ui.components.utils.uiFunctionBase import UIFunctionBase
+from ui.publicDefs.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING, NODE_VERTICAL_SPACING
 
-class NodeManager(GitRepoInfoMgr):
+class NodeManager(GitRepoInfoMgr, UIFunctionBase):
     def __init__(self, repoPath: str) -> None:
         GitRepoInfoMgr.__init__(self, repoPath)
 
         self.nodes: dict[str, RoundNodeGrphic] = {}
         self.connections: dict[str, ConnectionLineGraphic] = {}
         self.selected: Optional[RoundNodeGrphic] = None
+
+        self.subscribeEvt()
 
     def boundToScene(self, scene: QGraphicsScene) -> None:
         self.scene = scene
@@ -156,7 +157,7 @@ class NodeManager(GitRepoInfoMgr):
 
     def nodeMaxLevel(self) -> int:
         leafNodeList: list[str] = self.all_leaves()
-        maxLevel = 0;
+        maxLevel = 0
         for nodeHash in leafNodeList:
             node = self.getNode(nodeHash)
             if not node:
@@ -165,7 +166,7 @@ class NodeManager(GitRepoInfoMgr):
 
         return maxLevel
 
-    def arrangeNodeGraphics(self):
+    def arrangeNodeGraphics(self, event: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):
         def haveSameParent(nodeAHash: str, nodeBHash: str):
             nodeA = self.getNode(nodeAHash)
             nodeB = self.getNode(nodeBHash)
@@ -198,8 +199,8 @@ class NodeManager(GitRepoInfoMgr):
                 if not node:
                     continue
                 node.setPos(
-                    node.pos().x() + alphaX,
-                    node.pos().y() + alphaY,
+                    node.scenePos().x() + alphaX,
+                    node.scenePos().y() + alphaY,
                 )
 
         def arrangeNodeList(nodeList: list[str]):
@@ -212,7 +213,7 @@ class NodeManager(GitRepoInfoMgr):
                 node = self.getNode(nodeHash)
                 if not node:
                     continue
-                node.setPos(baseNode.pos().x() + NODE_HORIZONTAL_SPACING * (i + 1), baseNode.pos().y())
+                node.setPos(baseNode.scenePos().x() + NODE_HORIZONTAL_SPACING * (i + 1), baseNode.scenePos().y())
 
         # 获取一组节点的外接矩形
         def getNodeListBoundingRect(nodeList: list[str]) -> QRectF:
@@ -235,10 +236,7 @@ class NodeManager(GitRepoInfoMgr):
             return QRectF(minX, maxY, maxX - minX, maxY - minY)
 
         # 将一个组内的节点进行排列
-        def arrangeGroupNode(grpNodeDict: dict[str, list[str]]) -> QRectF:
-            if len(grpNodeDict) > 1:
-                raise Error("一个节点不能有两个上游节点!")
-
+        def arrangeNodeInGroup(grpNodeDict: dict[str, list[str]]) -> QRectF:
             for parent, grp in grpNodeDict.items():
                 parentNodePos = self.getNodePosition(parent)
                 if parentNodePos is None:
@@ -250,22 +248,45 @@ class NodeManager(GitRepoInfoMgr):
                 loggerPrint(f"xRange: ({boundingRect.x()}, {boundingRect.x() + boundingRect.width()}), yRange: ({boundingRect.y()}, {boundingRect.y() + boundingRect.height()}), children: {grp}")
                 centerX = (boundingRect.x() + boundingRect.x() + boundingRect.width()) / 2
                 alphaX = parentNodePos.x() - centerX
-                moveNodeList(grp, alphaX, 0)
+                alphaY = parentNodePos.y() + NODE_VERTICAL_SPACING - boundingRect.y()
+                moveNodeList(grp, alphaX, alphaY)
 
                 return getNodeListBoundingRect([node for node in grp] + [parent])
-            return QRectF()
+
+            raise RuntimeError("一个节点不能有两个直接上游节点!")
 
         # 将根节点与他的每一个子节点都移动相同的位移
-        def moveNodeGroup(groupNodeDict: dict[str, list[str]], parentPos: QPointF):
-            pass
+        def moveNodeGroup(grpNodeDict: dict[str, list[str]], alphaX: float, alphaY: float):
+            for parent, grp in grpNodeDict.items():
+                moveNodeList(grp + [parent], alphaX, alphaY)
+                return
+
+            raise RuntimeError("一个节点不能有两个直接上游节点!")
+
+        def arrangeNodeGrps(grpNodeDict: dict[str, list[str]]):
+            for parent, _ in grpNodeDict.items():
+                parentNode = self.getNode(parent)
+                parentNodePos = self.getNodePosition(parent)
+                if parentNode is None or parentNodePos is None:
+                    continue
+                if len(parentNode.parents) == 0:
+                    continue
+                grandParent = parentNode.parents[0]
+                grandParentNodePos = self.getNodePosition(grandParent)
+                if grandParentNodePos is None:
+                    continue
+                alphaY = grandParentNodePos.y() + NODE_VERTICAL_SPACING - parentNodePos.y()
+                moveNodeGroup(grpNodeDict, 0, alphaY)
+                break
 
         maxLevel = self.nodeMaxLevel()
+        # 节点组居中对齐
         for level in range(1, maxLevel + 1):
             levelNodes: list[str] = self.getNodesByLevel(level)
             levelGrpNodes = groupByParent(levelNodes)
-            grpBoundingRect = arrangeGroupNode(levelGrpNodes)
-            loggerPrint(f"""\
-level: {level} - {levelGrpNodes} - \
-left: {grpBoundingRect.x()}, right: {grpBoundingRect.x() + grpBoundingRect.width()}, \
-top: {grpBoundingRect.y()}, bottom: {grpBoundingRect.y() + grpBoundingRect.height()}\
-""")
+            grpBoundingRect = arrangeNodeInGroup(levelGrpNodes)
+            arrangeNodeGrps(levelGrpNodes)
+            loggerPrint(f"level: {level} - {levelGrpNodes} - left: {grpBoundingRect.x()}, right: {grpBoundingRect.x() + grpBoundingRect.width()}, top: {grpBoundingRect.y()}, bottom: {grpBoundingRect.y() + grpBoundingRect.height()}")
+
+    def subscribeEvt(self):
+        self.uiSubscribe(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODE, self.arrangeNodeGraphics, EventFuncType.UI_DRAWING_EVENT)
