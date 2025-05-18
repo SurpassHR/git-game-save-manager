@@ -24,3 +24,8 @@ def getHeadersFromDict(data: dict) -> list:
     for key in data.keys():
         header.append(key)
     return header
+
+def listDedup(dataList: list) -> list:
+    tempDataList = []
+    [tempDataList.append(item) for item in dataList if item not in tempDataList]
+    return tempDataList

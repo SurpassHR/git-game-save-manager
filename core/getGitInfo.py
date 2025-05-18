@@ -24,7 +24,7 @@ class CommitObj:
     ):
         self.hexSha = hexSha
         self.author = author
-        self.message = message
+        self.message = message.strip()
         self.parents = parents
         self.children = children
         self.branches = branches
@@ -137,6 +137,6 @@ if __name__ == '__main__':
     repoPath = "F:\\Games\\25-05-03\\克莱尔的任务Claire's Quest 0.28.1\\www\\save"
     repoInfoMgr = GitRepoInfoMgr(repoPath)
     commitInfo = repoInfoMgr.getRepoRawCommitInfo()
-    print(commitInfo)
-    print(repoInfoMgr.graph.__dict__)
+    for k, v in repoInfoMgr.graph.items():
+        print(k, v)
     # print(repoInfoMgr.createDAG().graph)

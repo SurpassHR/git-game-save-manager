@@ -1,21 +1,30 @@
+from csv import Error
 import sys
 from pathlib import Path
+from tkinter import Y
+from turtle import width
 from PyQt5.QtGui import QPen, QColor, QBrush
 from PyQt5.QtWidgets import QGraphicsItem, QGraphicsScene
 from PyQt5.QtCore import QRectF, QPointF, QSizeF
 from typing import Optional
 
+from core.tools.publicDef.levelDefs import LogLevels
+from core.tools.utils.dataStructTools import listDedup
+
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
-from core.getGitInfo import CommitObj
+from core.getGitInfo import CommitObj, GitRepoInfoMgr
 from core.tools.utils.simpleLogger import loggerPrint
+
 from ui.components.graphics.roundNodeGraphic import RoundNodeGrphic
 from ui.components.graphics.connectionLineGraphic import ConnectionLineGraphic
-from ui.tools.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH
+from ui.tools.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING
 
-class NodeManager:
-    def __init__(self) -> None:
+class NodeManager(GitRepoInfoMgr):
+    def __init__(self, repoPath: str) -> None:
+        GitRepoInfoMgr.__init__(self, repoPath)
+
         self.nodes: dict[str, RoundNodeGrphic] = {}
         self.connections: dict[str, ConnectionLineGraphic] = {}
         self.selected: Optional[RoundNodeGrphic] = None
@@ -83,7 +92,7 @@ class NodeManager:
             self.scene.addItem(round)
 
         # 连接父节点与子节点
-        loggerPrint(fr"created node {round.hexSha} graphic, parents {round.parents}, pos: ({x}, {y}), radius: {r}")
+        loggerPrint(fr"create node: {round.hexSha} graphic, parents: {round.parents}, level: {round.level}, pos: ({x}, {y}), msg: {round.message}")
 
         # 判断是否根节点
         if len(round.parents) == 0:
@@ -107,7 +116,7 @@ class NodeManager:
         node = self.nodes.get(hexSha)
         if not node:
             return None
-        loggerPrint(f"get node {hexSha} graphic position: {node.scenePos()}")
+        loggerPrint(f"get node '{hexSha}' graphic position: {node.scenePos()}", level=LogLevels.DEBUG)
         return node.scenePos()
 
     # 获取图形的外接矩形的大小
@@ -115,7 +124,7 @@ class NodeManager:
         node = self.nodes.get(hexSha)
         if not node:
             return None
-        loggerPrint(f"get node {hexSha} graphic size: {node.boundingRect().size()}")
+        loggerPrint(f"get node '{hexSha}' graphic size: {node.boundingRect().size()}", level=LogLevels.DEBUG)
         return node.boundingRect().size()
 
     def removeGraphic(self, hexSha: str) -> None:
@@ -123,7 +132,7 @@ class NodeManager:
         if not node:
             return None
 
-        loggerPrint(f"remove node {hexSha} graphic, pos: ({node.pos().x()}, {node.pos().y()}), radius: {node.rect().width()}")
+        loggerPrint(f"remove node '{hexSha}' graphic, pos: ({node.pos().x()}, {node.pos().y()}), radius: {node.rect().width()}")
         node.hide()
         self.scene.removeItem(node)
         _ = self.nodes.pop(hexSha)
@@ -138,8 +147,125 @@ class NodeManager:
             if node.isSelected():
                 node.setSelected(False)
 
-    def getAllLeafNodes(self) -> None:
-        nodeIdList: list[str] = []
+    def getNodesByLevel(self, level: int) -> list[str]:
+        nodeList: list[str] = []
         for node in self.nodes.values():
-            if len(node.children) == 0:
-                nodeIdList.append(node.hexSha)
+            if node.level == level:
+                nodeList.append(node.hexSha)
+        return nodeList
+
+    def nodeMaxLevel(self) -> int:
+        leafNodeList: list[str] = self.all_leaves()
+        maxLevel = 0;
+        for nodeHash in leafNodeList:
+            node = self.getNode(nodeHash)
+            if not node:
+                continue
+            maxLevel = max(maxLevel, node.level)
+
+        return maxLevel
+
+    def arrangeNodeGraphics(self):
+        def haveSameParent(nodeAHash: str, nodeBHash: str):
+            nodeA = self.getNode(nodeAHash)
+            nodeB = self.getNode(nodeBHash)
+            if not nodeA or not nodeB:
+                return False, None
+            for nodeAParent in nodeA.parents:
+                if nodeAParent in nodeB.parents:
+                    return True, nodeAParent
+            return False, None
+
+        def groupByParent(sameLevelNodes: list[str]) -> dict:
+            nodeDict: dict[str, list[str]] = {}
+            for nodeA in sameLevelNodes:
+                for nodeB in sameLevelNodes:
+                    isHaveSameParent, parent = haveSameParent(nodeA, nodeB)
+                    if isHaveSameParent and parent is not None:
+                        if not nodeDict.get(parent):
+                            nodeDict[parent] = [nodeA, nodeB]
+                        else:
+                            nodeDict[parent].extend([nodeA, nodeB])
+
+            for parent, grp in nodeDict.items():
+                nodeDict[parent] = listDedup(grp)
+
+            return nodeDict
+
+        def moveNodeList(nodeList: list[str], alphaX: float, alphaY: float):
+            for nodeHash in nodeList:
+                node = self.getNode(nodeHash)
+                if not node:
+                    continue
+                node.setPos(
+                    node.pos().x() + alphaX,
+                    node.pos().y() + alphaY,
+                )
+
+        def arrangeNodeList(nodeList: list[str]):
+            baseNode = self.getNode(nodeList[0])
+            baseNodePos = self.getNodePosition(nodeList[0])
+            if baseNode is None or baseNodePos is None:
+                return
+
+            for i, nodeHash in enumerate(nodeList[1:]):
+                node = self.getNode(nodeHash)
+                if not node:
+                    continue
+                node.setPos(baseNode.pos().x() + NODE_HORIZONTAL_SPACING * (i + 1), baseNode.pos().y())
+
+        # 获取一组节点的外接矩形
+        def getNodeListBoundingRect(nodeList: list[str]) -> QRectF:
+            maxY = -1e6
+            minY = 1e6
+            maxX = -1e6
+            minX = 1e6
+
+            for nodeHash in nodeList:
+                nodePos = self.getNodePosition(nodeHash)
+                nodeSize = self.getNodeGraphicSize(nodeHash)
+                if nodePos is None or nodeSize is None:
+                    continue
+
+                maxX = max(maxX, nodePos.x())
+                minX = min(minX, nodePos.x())
+                maxY = max(maxY, nodePos.y())
+                minY = min(minY, nodePos.y())
+
+            return QRectF(minX, maxY, maxX - minX, maxY - minY)
+
+        # 将一个组内的节点进行排列
+        def arrangeGroupNode(grpNodeDict: dict[str, list[str]]) -> QRectF:
+            if len(grpNodeDict) > 1:
+                raise Error("一个节点不能有两个上游节点!")
+
+            for parent, grp in grpNodeDict.items():
+                parentNodePos = self.getNodePosition(parent)
+                if parentNodePos is None:
+                    continue
+
+                arrangeNodeList(grp)
+                boundingRect = getNodeListBoundingRect(grp)
+                loggerPrint(f"parent: '{parent}', pos: ({parentNodePos.x()}, {parentNodePos.y()})")
+                loggerPrint(f"xRange: ({boundingRect.x()}, {boundingRect.x() + boundingRect.width()}), yRange: ({boundingRect.y()}, {boundingRect.y() + boundingRect.height()}), children: {grp}")
+                centerX = (boundingRect.x() + boundingRect.x() + boundingRect.width()) / 2
+                alphaX = parentNodePos.x() - centerX
+                moveNodeList(grp, alphaX, 0)
+
+                return getNodeListBoundingRect([node for node in grp] + [parent])
+            return QRectF()
+
+        # 将根节点与他的每一个子节点都移动相同的位移
+        def moveNodeGroup(groupNodeDict: dict[str, list[str]], parentPos: QPointF):
+            pass
+
+        maxLevel = self.nodeMaxLevel()
+        for level in range(1, maxLevel + 1):
+            levelNodes: list[str] = self.getNodesByLevel(level)
+            levelGrpNodes = groupByParent(levelNodes)
+            grpBoundingRect = arrangeGroupNode(levelGrpNodes)
+            loggerPrint(f"""\
+level: {level} - {levelGrpNodes} - \
+left: {grpBoundingRect.x()}, right: {grpBoundingRect.x() + grpBoundingRect.width()}, \
+top: {grpBoundingRect.y()}, bottom: {grpBoundingRect.y() + grpBoundingRect.height()}\
+""")

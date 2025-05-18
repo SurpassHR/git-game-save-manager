@@ -9,9 +9,12 @@ sys.path.append(rootPath)
 
 from ui.components.graphicManager import NodeManager
 
-class GridScene(QGraphicsScene, NodeManager):
+class GridScene(NodeManager, QGraphicsScene):
     def __init__(self, parent=None):
-        super().__init__(parent)
+        QGraphicsScene.__init__(self, parent)
+        repoPath = "F:\\Games\\25-05-03\\克莱尔的任务Claire's Quest 0.28.1\\www\\save"
+        NodeManager.__init__(self, repoPath)
+
         self.grid_size = 20  # 网格基础大小（像素）
         self.grid_color = QColor(220, 220, 220)  # 浅灰色网格
         self.boundToScene(self)

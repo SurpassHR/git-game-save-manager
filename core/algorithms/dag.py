@@ -1,7 +1,13 @@
+import sys
+from pathlib import Path
 from collections import OrderedDict, defaultdict
 from copy import copy, deepcopy
 from rich.pretty import pprint
 
+rootPath = str(Path(__file__).resolve().parent.parent.parent)
+sys.path.append(rootPath)
+
+from core.tools.utils.simpleLogger import loggerPrint
 
 class DAG(object):
     """ Directed acyclic graph implementation. """
@@ -196,7 +202,7 @@ class DAG(object):
             if fromNode == toNode:
                 return
 
-            fromNodeDown = self.all_downstreams(fromNode)
+            fromNodeDown = self.downstream(fromNode)
             for node in fromNodeDown:
                 currNodeDown = self.all_downstreams(node)
                 if toNode in currNodeDown or toNode in fromNodeDown:
@@ -223,6 +229,7 @@ class DAG(object):
                 toNode=nodeB,
                 path=path,
             )
+        loggerPrint(f"nodeA: '{nodeA}', nodeB: '{nodeB}' - {path}")
         return len(path)
 
 if __name__ == '__main__':

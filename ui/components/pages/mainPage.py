@@ -6,23 +6,20 @@ from pathlib import Path
 from qfluentwidgets import PrimaryPushButton
 from qfluentwidgets.common.icon import FluentIcon
 
-rootPath = str(Path(__file__).resolve().parent.parent)
+rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
+from core.tools.utils.dataStructTools import listDedup
 from core.tools.utils.simpleLogger import loggerPrint
-from core.getGitInfo import GitRepoInfoMgr, CommitObj
+from core.getGitInfo import CommitObj
 from ui.components.widgets.infiniteCanvasView import InfiniteCanvasView
 from ui.components.widgets.gridScene import SmartGridScene
 from ui.tools.styleDefs import NODE_VERTICAL_SPACING
-from ui.components.graphics.roundNodeGraphic import RoundNodeGrphic
 
 
-class MainPage(GitRepoInfoMgr, QFrame):
+class MainPage(QFrame):
     def __init__(self, text: str, window) -> None:
         QFrame.__init__(self, window)
-        repoPath = "F:\\Games\\25-05-03\\克莱尔的任务Claire's Quest 0.28.1\\www\\save"
-        GitRepoInfoMgr.__init__(self, repoPath=repoPath)
-        # QFrame.__init__(self, parent=window)
 
         self.setObjectName(text.replace(" ", "-"))
 
@@ -39,10 +36,10 @@ class MainPage(GitRepoInfoMgr, QFrame):
         container.addWidget(view)
 
     def addNodesFromGitInfo(self) -> None:
-        commitDict: dict[str, CommitObj] = self.getRepoRawCommitInfo()
-        # gitInfo: object = self.createDAG(commitInfo)
-        for k in reversed(self.graph.keys()):
+        commitDict: dict[str, CommitObj] = self.scene.getRepoRawCommitInfo()
+        for k in reversed(self.scene.graph.keys()):
             self.addNodeFromRelations(commitDict[k])
+        self.scene.arrangeNodeGraphics()
 
     def createUI(self) -> None:
         container = QVBoxLayout()
@@ -62,8 +59,14 @@ class MainPage(GitRepoInfoMgr, QFrame):
             )
             btn2.clicked.connect(self.removeSelectedNode)
 
+            btn3 = PrimaryPushButton(
+                text="整理节点",
+                icon=FluentIcon.ROTATE,
+            )
+
             btnContainer.addWidget(btn1, 1)
             btnContainer.addWidget(btn2, 1)
+            btnContainer.addWidget(btn3, 1)
 
             container.addLayout(btnContainer)
 
@@ -129,15 +132,8 @@ class MainPage(GitRepoInfoMgr, QFrame):
                 y=pos.y() + NODE_VERTICAL_SPACING,
                 r=30,
                 commitObj=commitObj,
-                level=self.distance(rootNode.hexSha, commitObj.hexSha),
+                level=self.scene.distance(rootNode.hexSha, commitObj.hexSha),
             )
-
-        loggerPrint(f"{commitObj.message}")
-
-    def arrangeNodeGraphics(self):
-        def traverseDAGToArrangeNodes(node: RoundNodeGrphic):
-            pass
-
 
     def removeSelectedNode(self) -> None:
         selectedNode = self.scene.getSelected()
