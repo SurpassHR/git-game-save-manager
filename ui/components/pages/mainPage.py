@@ -6,6 +6,7 @@ from pathlib import Path
 from qfluentwidgets import PrimaryPushButton
 from qfluentwidgets.common.icon import FluentIcon
 
+from core.tools.utils.simpleLogger import loggerPrint
 from ui.components.utils.eventManager import EventEnum
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
@@ -42,6 +43,11 @@ class MainPage(QFrame, UIFunctionBase):
             self.addNodeFromRelations(commitDict[k])
         self.scene.arrangeNodeGraphics()
 
+    def addConnectionFromGitInfo(self) -> None:
+        edges = self.scene.get_all_edges()
+        for edge in edges:
+            self.scene.createConnections(edge[0], edge[1])
+
     def createUI(self) -> None:
         container = QVBoxLayout()
 
@@ -64,7 +70,7 @@ class MainPage(QFrame, UIFunctionBase):
                 text="整理节点",
                 icon=FluentIcon.ROTATE,
             )
-            btn3.clicked.connect(lambda: self.uiEmit(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODE, {}))
+            btn3.clicked.connect(lambda: self.uiEmit(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODES, {}))
 
             btnContainer.addWidget(btn1, 1)
             btnContainer.addWidget(btn2, 1)
@@ -75,9 +81,11 @@ class MainPage(QFrame, UIFunctionBase):
         addCtrlBtn(container)
         self.addScene(container)
         self.addNodesFromGitInfo()
+        self.addConnectionFromGitInfo()
         self.setLayout(container)
 
     def addStandardNode(self) -> None:
+        # 触发创建 commit 事件，并获取返回的 commitObj 数据
         return
 
         selectedNode = self.scene.getSelected()

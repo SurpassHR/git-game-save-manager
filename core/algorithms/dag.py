@@ -232,6 +232,15 @@ class DAG(object):
         loggerPrint(f"nodeA: '{nodeA}', nodeB: '{nodeB}' - {path}")
         return len(path)
 
+    def get_all_edges(self, graph = None):
+        if graph is None:
+            graph = self.graph
+        edges = []
+        for node, neighbors in graph.items():
+            for neighbor in neighbors:
+                edges.append((node, neighbor))
+        return edges
+
 if __name__ == '__main__':
     dag = DAG()
     dag.add_node("a")
@@ -244,6 +253,7 @@ if __name__ == '__main__':
     dag.add_edge("b", "c")
     dag.add_edge("c", "e")
     # pprint(dag.topological_sort())
-    # pprint(dag.graph)
+    pprint(dag.graph)
     # pprint(dag.all_downstreams("b"))
     pprint(dag.distance("b", "e"))
+    pprint(dag.get_all_edges())

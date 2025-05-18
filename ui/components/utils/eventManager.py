@@ -27,7 +27,7 @@ class EventFuncType(IntEnum):
 
 class EventEnum(IntEnum):
     EVENT_INVALID = 0
-    GRAPHIC_MANAGER_ARRANGE_NODE = 1 # 图形管理整理节点图形
+    GRAPHIC_MANAGER_ARRANGE_NODES = 1 # 图形管理整理节点图形
 
 
 class EventTask(QRunnable):

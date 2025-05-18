@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from PyQt5.QtGui import QPen, QColor, QBrush
 from PyQt5.QtWidgets import QGraphicsItem, QGraphicsScene
-from PyQt5.QtCore import QRectF, QPointF, QSizeF, pyqtSignal
+from PyQt5.QtCore import QRectF, QPointF, QSizeF
 from typing import Optional
 
 from core.tools.publicDef.levelDefs import LogLevels
@@ -14,8 +14,8 @@ sys.path.append(rootPath)
 from core.getGitInfo import CommitObj, GitRepoInfoMgr
 from core.tools.utils.simpleLogger import loggerPrint
 
-from ui.components.graphics.roundNodeGraphic import RoundNodeGrphic
-from ui.components.graphics.connectionLineGraphic import ConnectionLineGraphic
+from ui.components.graphics.roundNodeGraphic import RoundNodeGraphic
+from ui.components.graphics.edgeLineGraphic import EdgeLineGraphic
 from ui.components.utils.eventManager import EventEnum, EventFuncType
 from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.publicDefs.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING, NODE_VERTICAL_SPACING
@@ -24,9 +24,9 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
     def __init__(self, repoPath: str) -> None:
         GitRepoInfoMgr.__init__(self, repoPath)
 
-        self.nodes: dict[str, RoundNodeGrphic] = {}
-        self.connections: dict[str, ConnectionLineGraphic] = {}
-        self.selected: Optional[RoundNodeGrphic] = None
+        self.nodes: dict[str, RoundNodeGraphic] = {}
+        self.edges: dict[str, EdgeLineGraphic] = {}
+        self.selected: Optional[RoundNodeGraphic] = None
 
         self.subscribeEvt()
 
@@ -36,12 +36,12 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
     def setSelected(self, graphicId: str, isSelected: bool):
         if isSelected:
             self.selected = self.getNode(graphicId)
-            loggerPrint(f"node selected: {graphicId}")
+            loggerPrint(f"node selected: '{graphicId}'")
         else:
             self.selected = None
-            loggerPrint(f"node diselected: {graphicId}")
+            loggerPrint(f"node diselected: '{graphicId}'")
 
-    def getSelected(self) -> Optional[RoundNodeGrphic]:
+    def getSelected(self) -> Optional[RoundNodeGraphic]:
         return self.selected
 
     def isEmpty(self):
@@ -56,23 +56,19 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         level: int,
         border: str | QPen = NODE_BORDER_DEFAULT_PEN,
         fill: str | QBrush = NODE_FILL_DEFAULT_BRUSH,
-    ) -> Optional[RoundNodeGrphic]:
+    ) -> Optional[RoundNodeGraphic]:
         isNodeExisted = self.nodes.get(commitObj.hexSha, '') != ''
         if isNodeExisted:
             return
 
         # 创建图形
-        round = RoundNodeGrphic(
+        round = RoundNodeGraphic(
             rect=QRectF(0, 0, r, r),
             selectCb=self.setSelected,
             level=level,
         )
         round.setCommitInfo(commitObj)
         round.setPos(x, y)
-
-        # 设置图形属性: 可拖动、可选中
-        round.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-        round.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
 
         # 设置图形样式
         pen: QPen = QPen()
@@ -101,13 +97,29 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
         return round
 
-    def getNode(self, hexSha: str) -> Optional[RoundNodeGrphic]:
+    def createConnections(
+            self,
+            fromNodeHash: str,
+            toNodeHash: str,
+        ):
+        fromNode = self.getNode(fromNodeHash)
+        toNode = self.getNode(toNodeHash)
+        if fromNode is None or toNode is None:
+            return
+
+        edge = EdgeLineGraphic(fromNode, toNode)
+        fromNode.addConnection(edge)
+        toNode.addConnection(edge)
+        self.edges[f"{fromNodeHash}->{toNodeHash}"] = edge
+        self.scene.addItem(edge)
+
+    def getNode(self, hexSha: str) -> Optional[RoundNodeGraphic]:
         node = self.nodes.get(hexSha)
         if not node:
             return None
         return node
 
-    def getRootNode(self) -> Optional[RoundNodeGrphic]:
+    def getRootNode(self) -> Optional[RoundNodeGraphic]:
         node = self.nodes.get(self.rootNode)
         if not node:
             return None
@@ -287,6 +299,11 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             grpBoundingRect = arrangeNodeInGroup(levelGrpNodes)
             arrangeNodeGrps(levelGrpNodes)
             loggerPrint(f"level: {level} - {levelGrpNodes} - left: {grpBoundingRect.x()}, right: {grpBoundingRect.x() + grpBoundingRect.width()}, top: {grpBoundingRect.y()}, bottom: {grpBoundingRect.y() + grpBoundingRect.height()}")
+        self.forceUpdateAllEdges()
+
+    def forceUpdateAllEdges(self):
+        for edge in self.edges.values():
+            edge.updatePosition()
 
     def subscribeEvt(self):
-        self.uiSubscribe(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODE, self.arrangeNodeGraphics, EventFuncType.UI_DRAWING_EVENT)
+        self.uiSubscribe(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODES, self.arrangeNodeGraphics, EventFuncType.UI_DRAWING_EVENT)
