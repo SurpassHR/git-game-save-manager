@@ -1,42 +1,53 @@
 import sys
+from pathlib import Path
+from typing import override
 from PyQt5.QtCore import Qt, QPointF, QRectF
 from PyQt5.QtGui import QBrush, QPen, QColor
 from PyQt5.QtWidgets import (QApplication, QGraphicsScene, QGraphicsView,
                            QGraphicsItem, QGraphicsRectItem,
                            QMainWindow)
 
+rootPath = str(Path(__file__).resolve().parent.parent)
+sys.path.append(rootPath)
+
 from core.tools.utils.simpleLogger import loggerPrint
-from rich import print
 
 class DraggableItem(QGraphicsRectItem):
-    def __init__(self, x, y, width, height, color=Qt.blue, name=""):
+    def __init__(self, x, y, width, height, color=Qt.GlobalColor.blue, name=""):
         super().__init__(0, 0, width, height)
         self.setPos(x, y)
         self.setBrush(QBrush(color))
-        self.setPen(QPen(Qt.black, 2))
-        self.setFlag(QGraphicsItem.ItemIsMovable)
-        self.setFlag(QGraphicsItem.ItemIsSelectable)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
+        self.setPen(QPen(Qt.GlobalColor.black, 2))
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.name = name
-        self.original_pos = self.pos()
-        self.currently_dragged = False
+        self.originalPos = self.pos()
+        self.isDragging = False
 
+    @override
     def mouseReleaseEvent(self, event):
-        self.currently_dragged = False
+        self.isDragging = False
         super().mouseReleaseEvent(event)
 
+    @override
     def mousePressEvent(self, event):
-        self.currently_dragged = True
+        self.isDragging = True
         super().mousePressEvent(event)
 
+    @override
     def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemPositionChange and self.scene():
+        scene: CollisionScene = self.scene() # type: ignore
+        if scene is None:
+            return super().itemChange(change, value)
+
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
             # 只处理由拖动引起的位置变化
-            if self.currently_dragged:
-                self.original_pos = self.pos()
-                new_pos = value
+            if self.isDragging:
+                self.originalPos = self.pos()
+                newPos = value
                 # 如果拖动的是当前项，立即通知场景处理碰撞
-                self.scene().handle_collision_for_dragged_item(self, new_pos)
+                scene.handleCollisionForDraggedItem(self, newPos)
 
         # 始终按正常方式更新位置
         return super().itemChange(change, value)
@@ -45,41 +56,41 @@ class DraggableItem(QGraphicsRectItem):
 class CollisionScene(QGraphicsScene):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.collision_in_progress = False
+        self.isProcessingCollision = False
 
-    def handleCollisionForDraggedItem(self, dragged_item, new_pos):
+    def handleCollisionForDraggedItem(self, draggedItem, newPos):
         """处理拖动项的碰撞"""
-        if self.collision_in_progress:
+        if self.isProcessingCollision:
             return
 
-        self.collision_in_progress = True
+        self.isProcessingCollision = True
         try:
             # 保存原始位置并模拟移动
-            original_pos = dragged_item.pos()
-            dragged_item.setPos(new_pos)
+            originalPos = draggedItem.pos()
+            draggedItem.setPos(newPos)
 
             # 一次性处理所有碰撞
-            self.resolveAllCollisions(dragged_item)
+            self.resolveAllCollisions(draggedItem)
 
             # 还原拖动项的位置，让系统继续处理正常的拖动
-            dragged_item.setPos(original_pos)
+            draggedItem.setPos(originalPos)
 
         finally:
-            self.collision_in_progress = False
-        # self.finalCheckIntersect(dragged_item)
+            self.isProcessingCollision = False
+        # self.finalCheckIntersect(draggedItem)
 
-    def distanceSquare(self, item: DraggableItem, dragged_item: DraggableItem):
+    def distanceSquare(self, item: DraggableItem, draggedItem: DraggableItem):
         item1Center = item.sceneBoundingRect().center()
-        item2Center = dragged_item.sceneBoundingRect().center()
+        item2Center = draggedItem.sceneBoundingRect().center()
         # print(f"itemCenter: {item1Center} draggedItemCenter: {item2Center}")
 
         return int(item1Center.x() - item2Center.x())**2 + int(item1Center.y() - item2Center.y())**2
 
-    def finalCheckIntersect(self, dragged_item: DraggableItem):
+    def finalCheckIntersect(self, draggedItem: DraggableItem):
         itersectDict = {}
         cnt = 0
-        items_to_check: list[QGraphicsItem] = list(self.items())
-        checkedPair: list[tuple[QGraphicsItem, QGraphicsItem]] = []
+        items_to_check: list[DraggableItem] = list(self.items()) # type: ignore
+        checkedPair: list[tuple[DraggableItem, DraggableItem]] = []
         for i, item1 in enumerate(items_to_check):
             item1RectF = item1.sceneBoundingRect()
             for item2 in items_to_check:
@@ -92,78 +103,77 @@ class CollisionScene(QGraphicsScene):
                 if intersectRect.width() > 20 or intersectRect.height() > 20:
                     itersectDict[cnt] = [item1.name, item2.name]
                     cnt += 1
-                    # moveItem, fixedItem = self.determine_move_and_fixed_items(item1, item2, dragged_item)
-                    # targetPos = self.calculate_push_vector(fixedItem, moveItem)
+                    # moveItem, fixedItem = self.determineMoveAndFixedItems(item1, item2, draggedItem)
+                    # targetPos = self.calculatePushVector(fixedItem, moveItem)
                     # moveItem.setPos(targetPos)
                     # checkedPair.append((item1, item2))
-        from rich import print
         if itersectDict != {}:
             print(itersectDict)
 
-    def resolveAllCollisions(self, dragged_item):
+    def resolveAllCollisions(self, draggedItem):
         """迭代解决场景中所有碰撞"""
-        max_iterations = 3  # 限制最大迭代次数
+        maxIterations = 3  # 限制最大迭代次数
 
         # 创建要处理的项列表
-        items_to_check: list[QGraphicsItem] = list(self.items())
+        itemsToCheck: list[QGraphicsItem] = list(self.items())
 
         # 标记哪些项是被处理过的
-        processed_items = set()
+        # processedItems = set()
 
         # 主循环
-        for iteration in range(max_iterations):
-            collision_found = False
+        for iteration in range(maxIterations):
+            collisionFound = False
 
             # 检查每个项的碰撞
-            for i, item1 in enumerate(items_to_check):
+            for i, item1 in enumerate(itemsToCheck):
                 # 只检查可移动的矩形项
                 if not isinstance(item1, DraggableItem):
                     continue
 
                 # 跳过被拖动的项（它不应该被推动）
-                if item1 == dragged_item:
+                if item1 == draggedItem:
                     continue
 
                 # 找出碰撞
-                colliding_items = []
-                for item2 in items_to_check:
+                collidingItems = []
+                for item2 in itemsToCheck:
                     if (item2 != item1 and
                         isinstance(item2, DraggableItem) and
                         item1.collidesWithItem(item2)):
-                        colliding_items.append(item2)
+                        collidingItems.append(item2)
 
-                if not colliding_items:
+                if not collidingItems:
                     continue
 
-                collision_found = True
+                collisionFound = True
 
                 # 对于每个碰撞，计算和应用推动向量
-                for item2 in colliding_items:
+                for item2 in collidingItems:
                     # 确定哪一个是固定的，哪一个应该移动
-                    move_item, fixed_item = self.determine_move_and_fixed_items(item1, item2, dragged_item)
-                    if move_item is None or fixed_item is None:
+                    itemToMove, itemToFixed = self.determineMoveAndFixedItems(item1, item2, draggedItem)
+                    if itemToMove is None or itemToFixed is None:
                         continue
 
                     # 计算推动向量
-                    push_vector = self.calculate_push_vector(move_item, fixed_item)
-                    if push_vector:
+                    pushVector = self.calculatePushVector(itemToMove, itemToFixed)
+                    if pushVector is not None:
                         # 应用推动向量
-                        new_pos = move_item.pos() + push_vector
-                        move_item.setPos(new_pos)
+                        targetPos = itemToMove.pos() + pushVector
+                        itemToMove.setPos(targetPos)
 
             # 如果没有找到碰撞，可以提前退出
-            if not collision_found:
+            if not collisionFound:
                 break
 
         # 结束处理
 
-    def determine_move_and_fixed_items(self, item1, item2, dragged_item):
+    def determineMoveAndFixedItems(self, item1, item2, draggedItem):
         """确定哪个项应该移动，哪个应该保持固定"""
         # 拖动的项始终是固定的
-        if item1 == dragged_item:
+        if item1 == draggedItem:
             # loggerPrint(f"move {item2.name} fixed {item1.name}")
             return item2, item1
-        elif item2 == dragged_item:
+        elif item2 == draggedItem:
             # loggerPrint(f"move {item1.name} fixed {item2.name}")
             return item1, item2
 
@@ -176,15 +186,15 @@ class CollisionScene(QGraphicsScene):
             return item1, item2
 
         # 两者都被选中或都未被选中，选择索引较大的（更晚添加到场景中的）移动
-        # all_items = self.items()
-        # if all_items.index(item1) > all_items.index(item2):
+        # allItems = self.items()
+        # if allItems.index(item1) > allItems.index(item2):
         #     return item1, item2
         # else:
         #     return item2, item1
 
         # 两者都被选中或都未被选中，选择距离被选中者较远的移动
-        dist1 = self.distanceSquare(item1, dragged_item)
-        dist2 = self.distanceSquare(item2, dragged_item)
+        dist1 = self.distanceSquare(item1, draggedItem)
+        dist2 = self.distanceSquare(item2, draggedItem)
         if dist1 < dist2:
             # loggerPrint(f"item2 dist {dist2} item1 dist {dist1}")
             # loggerPrint(f"move {item2.name} fixed {item1.name}")
@@ -194,32 +204,32 @@ class CollisionScene(QGraphicsScene):
             return item1, item2
 
 
-    def calculate_push_vector(self, move_item: DraggableItem, fixed_item: DraggableItem):
+    def calculatePushVector(self, itemToMove: DraggableItem, itemToFixed: DraggableItem):
         """计算推动向量"""
-        # print(f"proc {move_item.name} {fixed_item.name} collision")
-        move_rect = move_item.sceneBoundingRect()
-        fixed_rect = fixed_item.sceneBoundingRect()
+        # print(f"proc {itemToMove.name} {itemToFixed.name} collision")
+        itemToMoveRect = itemToMove.sceneBoundingRect()
+        itemToFixedRect = itemToFixed.sceneBoundingRect()
 
         # 确保矩形实际重叠
-        if not move_rect.intersects(fixed_rect):
-            # print(f"{move_item.name} not interset with {fixed_item.name}")
+        if not itemToMoveRect.intersects(itemToFixedRect):
+            # print(f"{itemToMove.name} not interset with {itemToFixed.name}")
             return None
 
         # 交集矩形
-        intersection = move_rect.intersected(fixed_rect)
+        intersection = itemToMoveRect.intersected(itemToFixedRect)
 
         # 如果交集无效，返回None
         if intersection.isEmpty() or intersection.width() <= 0 or intersection.height() <= 0:
-            # print(f"{move_item.name} not interset with {fixed_item.name}")
+            # print(f"{itemToMove.name} not interset with {itemToFixed.name}")
             return None
 
         # 计算物体中心点
-        move_center = move_rect.center()
-        fixed_center = fixed_rect.center()
+        movedItemCenter = itemToMoveRect.center()
+        fixedItemCenter = itemToFixedRect.center()
 
         # 方向向量（从固定物体指向移动物体）
-        dx = move_center.x() - fixed_center.x()
-        dy = move_center.y() - fixed_center.y()
+        dx = movedItemCenter.x() - fixedItemCenter.x()
+        dy = movedItemCenter.y() - fixedItemCenter.y()
 
         # 避免除零错误
         if abs(dx) < 0.1 and abs(dy) < 0.1:
@@ -229,15 +239,15 @@ class CollisionScene(QGraphicsScene):
         # 计算推动方向
         if intersection.width() < intersection.height():
             # 水平推动
-            push_x = intersection.width() * (1 if dx > 0 else -1) + 1
-            push_y = 0
+            alphaX = intersection.width() * (1 if dx > 0 else -1)
+            alphaY = 0
         else:
             # 垂直推动
-            push_x = 0
-            push_y = intersection.height() * (1 if dy > 0 else -1) + 1
+            alphaX = 0
+            alphaY = intersection.height() * (1 if dy > 0 else -1)
 
-        # print(f"{fixed_item.name} push {move_item.name} to {push_x, push_y}")
-        return QPointF(push_x, push_y)
+        # print(f"{itemToFixed.name} push {itemToMove.name} to {alphaX, alphaY}")
+        return QPointF(alphaX, alphaY)
 
 
 class CollisionTestWindow(QMainWindow):
