@@ -20,14 +20,20 @@ from core.tools.utils.simpleLogger import loggerPrint
 from core.tools.publicDef.levelDefs import LogLevels
 
 
-class EventFuncType(IntEnum):
-    UI_DRAWING_EVENT = 1 # UI 绘制相关事件，不能在子线程中执行
-    TIME_CONSUMING_EVENT = 2 # 耗时操作相关事件，可以在子线程中执行
-
-
 class EventEnum(IntEnum):
     EVENT_INVALID = 0
-    GRAPHIC_MANAGER_ARRANGE_NODES = 1 # 图形管理整理节点图形
+
+    # 逻辑事件线程
+    # 耗时逻辑操作相关事件，可以在子线程中执行
+    LOGIC_EVENT_START = 0x0000
+    LOGIC_GRAPHIC_MANAGER_ARRANGE_NODES = 0x0001 # 图形管理整理节点图形
+    LOGIC_EVENT_END = 0x0FFF
+
+    # UI事件线程
+    # UI 绘制相关事件，不能在子线程中执行
+    UI_EVENT_START = 0x1000
+    UI_GRAPHIC_MANAGER_MOVE_NODE = 0x1001 # 图形管理移动节点图形
+    UI_EVENT_END = 0x1FFF
 
 
 class EventTask(QRunnable):
@@ -54,10 +60,10 @@ class EventManager(QObject):
 
     # 自定义信号
     # 字典类型或者其他复杂对象应该使用 object 作为信号参数类型，这样可以传递任意 Python 对象，包括 dict
-    _signal = pyqtSignal(int, object)
+    _signal = pyqtSignal(EventEnum, object)
 
     # 事件列表
-    _eventCallbacks: dict[EventEnum, dict[Callable, EventFuncType]] = {}
+    _eventCallbacks: dict[EventEnum, list[Callable]] = {}
 
     # 错误事件在这里统一处理（完全不处理，直接弹框提示到对应位置修改问题，只要保证例外出现时不会导致 UI 进程挂掉）
     _errorSignal = pyqtSignal(str, str, str)
@@ -84,13 +90,14 @@ class EventManager(QObject):
 
     # 处理事件
     def processEvent(self, event: EventEnum, data: dict):
-        if event in self._eventCallbacks:
-            for handler, evtFuncType in self._eventCallbacks[event].items():
-                if evtFuncType == EventFuncType.TIME_CONSUMING_EVENT:
+        if event in self._eventCallbacks.keys():
+            isUiEvent = event > EventEnum.UI_EVENT_START.value and event < EventEnum.UI_EVENT_END.value
+            for handler in self._eventCallbacks[event]:
+                if isUiEvent:
+                    handler(event, data)
+                else:
                     task = EventTask(handler, event, data)
                     QThreadPool.globalInstance().start(task)  # type: ignore
-                else:
-                    handler(event, data)
 
     @pyqtSlot(MsgBoxLevels, str, object, object)
     def processMsgBox(self, level: MsgBoxLevels, msg: str, acptCbk: Optional[Callable] = None, rejtCbk: Optional[Callable] = None):
@@ -127,12 +134,12 @@ class EventManager(QObject):
         self._signal.emit(event, data)
 
     # 订阅事件
-    def subscribe(self, event: EventEnum, handler: Callable, evtFuncType: EventFuncType):
+    def subscribe(self, event: EventEnum, handler: Callable):
         if event not in self._eventCallbacks:
-            self._eventCallbacks[event] = {}
-        self._eventCallbacks[event][handler] = evtFuncType
+            self._eventCallbacks[event] = []
+        self._eventCallbacks[event].append(handler)
 
     # 取消订阅事件
     def unsubscribe(self, event: EventEnum, handler: Callable):
         if event in self._eventCallbacks:
-            self._eventCallbacks[event].pop(handler)
+            self._eventCallbacks[event].remove(handler)

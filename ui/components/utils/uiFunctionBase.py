@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QWidget
 
 from core.tools.utils.simpleLogger import loggerPrint
 from core.tools.publicDef.levelDefs import LogLevels, MsgBoxLevels
-from ui.components.utils.eventManager import EventManager, EventEnum, EventFuncType
+from ui.components.utils.eventManager import EventManager, EventEnum
 
 
 # 这里的全部信息都是每次从配置读取的，完全不使用缓存
@@ -37,15 +37,15 @@ class UIFunctionBase:
 
     # 触发事件
     def uiEmit(self, event: EventEnum, data: dict) -> None:
-        loggerPrint(f"触发事件: {event.name}", level=LogLevels.INFO)
+        loggerPrint(f"触发事件: {event.name}", level=LogLevels.DEBUG)
         EventManager.getSingleton().emit(event, data)
 
     # 订阅事件
-    def uiSubscribe(self, event: EventEnum, handler: Callable, evtFuncType: EventFuncType) -> None:
-        loggerPrint(f"订阅事件: {event.name}", level=LogLevels.INFO)
-        EventManager.getSingleton().subscribe(event, handler, evtFuncType)
+    def uiSubscribe(self, event: EventEnum, handler: Callable) -> None:
+        loggerPrint(f"订阅事件: {event.name}", level=LogLevels.DEBUG)
+        EventManager.getSingleton().subscribe(event, handler)
 
     # 取消订阅事件
     def uiUnsubscribe(self, event: EventEnum, handler: Callable) -> None:
-        loggerPrint(f"取消订阅事件: {event.name}", level=LogLevels.INFO)
+        loggerPrint(f"取消订阅事件: {event.name}", level=LogLevels.DEBUG)
         EventManager.getSingleton().unsubscribe(event, handler)

@@ -41,7 +41,7 @@ class MainPage(QFrame, UIFunctionBase):
         commitDict: dict[str, CommitObj] = self.scene.getRepoRawCommitInfo()
         for k in reversed(self.scene.graph.keys()):
             self.addNodeFromRelations(commitDict[k])
-        self.scene.arrangeNodeGraphics()
+        self.scene._logicEvt_arrangeNodeGraphics()
 
     def addConnectionFromGitInfo(self) -> None:
         edges = self.scene.get_all_edges()
@@ -70,7 +70,7 @@ class MainPage(QFrame, UIFunctionBase):
                 text="整理节点",
                 icon=FluentIcon.ROTATE,
             )
-            btn3.clicked.connect(lambda: self.uiEmit(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODES, {}))
+            btn3.clicked.connect(lambda: self.uiEmit(EventEnum.LOGIC_GRAPHIC_MANAGER_ARRANGE_NODES, {}))
 
             btnContainer.addWidget(btn1, 1)
             btnContainer.addWidget(btn2, 1)

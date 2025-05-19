@@ -1,22 +1,21 @@
 import sys
 from pathlib import Path
 from PyQt5.QtGui import QPen, QColor, QBrush
-from PyQt5.QtWidgets import QGraphicsItem, QGraphicsScene
-from PyQt5.QtCore import QRectF, QPointF, QSizeF
+from PyQt5.QtWidgets import QGraphicsScene
+from PyQt5.QtCore import QRectF, QPointF, QSizeF, pyqtSlot
 from typing import Optional
-
-from core.tools.publicDef.levelDefs import LogLevels
-from core.tools.utils.dataStructTools import listDedup
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
+from core.tools.publicDef.levelDefs import LogLevels
+from core.tools.utils.dataStructTools import listDedup
 from core.getGitInfo import CommitObj, GitRepoInfoMgr
 from core.tools.utils.simpleLogger import loggerPrint
 
 from ui.components.graphics.roundNodeGraphic import RoundNodeGraphic
 from ui.components.graphics.edgeLineGraphic import EdgeLineGraphic
-from ui.components.utils.eventManager import EventEnum, EventFuncType
+from ui.components.utils.eventManager import EventEnum
 from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.publicDefs.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING, NODE_VERTICAL_SPACING
 
@@ -178,7 +177,24 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
         return maxLevel
 
-    def arrangeNodeGraphics(self, event: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):
+    # dict.values: node, posX, posY
+    @pyqtSlot(EventEnum, dict)
+    def _uiEvt_moveNode(self, _: EventEnum, data: dict):
+        if len(data) != 3:
+            return
+
+        node: Optional[RoundNodeGraphic] = data.get("node")
+        posX: Optional[float] = data.get("posX")
+        posY: Optional[float] = data.get("posY")
+
+        if node is None or posX is None or posY is None:
+            return
+
+        node.setPos(posX, posY)
+        self._forceUpdateAllEdges()
+
+    @pyqtSlot(EventEnum, dict)
+    def _logicEvt_arrangeNodeGraphics(self, _: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):
         def haveSameParent(nodeAHash: str, nodeBHash: str):
             nodeA = self.getNode(nodeAHash)
             nodeB = self.getNode(nodeBHash)
@@ -210,10 +226,12 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                 node = self.getNode(nodeHash)
                 if not node:
                     continue
-                node.setPos(
-                    node.scenePos().x() + alphaX,
-                    node.scenePos().y() + alphaY,
-                )
+                data = {
+                    "node": node,
+                    "posX": node.scenePos().x() + alphaX,
+                    "posY": node.scenePos().y() + alphaY,
+                }
+                self.uiEmit(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, data)
 
         def arrangeNodeList(nodeList: list[str]):
             baseNode = self.getNode(nodeList[0])
@@ -225,7 +243,12 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                 node = self.getNode(nodeHash)
                 if not node:
                     continue
-                node.setPos(baseNode.scenePos().x() + NODE_HORIZONTAL_SPACING * (i + 1), baseNode.scenePos().y())
+                data = {
+                    "node": node,
+                    "posX": baseNode.scenePos().x() + NODE_HORIZONTAL_SPACING * (i + 1),
+                    "posY": baseNode.scenePos().y(),
+                }
+                self.uiEmit(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, data)
 
         # 获取一组节点的外接矩形
         def getNodeListBoundingRect(nodeList: list[str]) -> QRectF:
@@ -256,8 +279,8 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
                 arrangeNodeList(grp)
                 boundingRect = getNodeListBoundingRect(grp)
-                loggerPrint(f"parent: '{parent}', pos: ({parentNodePos.x()}, {parentNodePos.y()})")
-                loggerPrint(f"xRange: ({boundingRect.x()}, {boundingRect.x() + boundingRect.width()}), yRange: ({boundingRect.y()}, {boundingRect.y() + boundingRect.height()}), children: {grp}")
+                loggerPrint(f"parent: '{parent}', pos: ({parentNodePos.x()}, {parentNodePos.y()})", level=LogLevels.DEBUG)
+                loggerPrint(f"xRange: ({boundingRect.x()}, {boundingRect.x() + boundingRect.width()}), yRange: ({boundingRect.y()}, {boundingRect.y() + boundingRect.height()}), children: {grp}", level=LogLevels.DEBUG)
                 centerX = (boundingRect.x() + boundingRect.x() + boundingRect.width()) / 2
                 alphaX = parentNodePos.x() - centerX
                 alphaY = parentNodePos.y() + NODE_VERTICAL_SPACING - boundingRect.y()
@@ -293,17 +316,21 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
         maxLevel = self.nodeMaxLevel()
         # 节点组居中对齐
+        # TODO: 细节待优化，节点移动与边移动不同步
         for level in range(1, maxLevel + 1):
             levelNodes: list[str] = self.getNodesByLevel(level)
             levelGrpNodes = groupByParent(levelNodes)
             grpBoundingRect = arrangeNodeInGroup(levelGrpNodes)
             arrangeNodeGrps(levelGrpNodes)
-            loggerPrint(f"level: {level} - {levelGrpNodes} - left: {grpBoundingRect.x()}, right: {grpBoundingRect.x() + grpBoundingRect.width()}, top: {grpBoundingRect.y()}, bottom: {grpBoundingRect.y() + grpBoundingRect.height()}")
-        self.forceUpdateAllEdges()
+            loggerPrint(
+                msg=f"level: {level} - {levelGrpNodes} - left: {grpBoundingRect.x()}, right: {grpBoundingRect.x() + grpBoundingRect.width()}, top: {grpBoundingRect.y()}, bottom: {grpBoundingRect.y() + grpBoundingRect.height()}",
+                level=LogLevels.DEBUG,
+            )
 
-    def forceUpdateAllEdges(self):
+    def _forceUpdateAllEdges(self):
         for edge in self.edges.values():
             edge.updatePosition()
 
     def subscribeEvt(self):
-        self.uiSubscribe(EventEnum.GRAPHIC_MANAGER_ARRANGE_NODES, self.arrangeNodeGraphics, EventFuncType.UI_DRAWING_EVENT)
+        self.uiSubscribe(EventEnum.LOGIC_GRAPHIC_MANAGER_ARRANGE_NODES, self._logicEvt_arrangeNodeGraphics)
+        self.uiSubscribe(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, self._uiEvt_moveNode)

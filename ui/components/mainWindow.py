@@ -15,8 +15,8 @@ from ui.components.utils.uiFunctionBase import UIFunctionBase
 
 
 class MainWindow(FluentWindow, UIFunctionBase):
-    APP_WIDTH = 1280
-    APP_HEIGHT = 720
+    APP_WIDTH = 1920
+    APP_HEIGHT = 1080
     THEME_COLOR = "#8A95A9"
 
     def __init__(self, git_manager) -> None:
@@ -32,7 +32,14 @@ class MainWindow(FluentWindow, UIFunctionBase):
         self.titleBar.iconLabel.hide()
 
         # 隐藏导航栏
-        self.navigationInterface.hide()
+        # self.navigationInterface.hide()
+
+        # 设置侧边栏宽度
+        self.navigationInterface.setExpandWidth(192)
+
+        # 侧边栏默认展开
+        self.navigationInterface.setMinimumExpandWidth(self.APP_WIDTH)
+        self.navigationInterface.expand(useAni = False)
 
         # 设置启动位置
         desktop = QApplication.desktop()
