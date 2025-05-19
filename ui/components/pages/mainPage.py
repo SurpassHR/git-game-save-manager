@@ -6,7 +6,6 @@ from pathlib import Path
 from qfluentwidgets import PrimaryPushButton
 from qfluentwidgets.common.icon import FluentIcon
 
-from core.tools.utils.simpleLogger import loggerPrint
 from ui.components.utils.eventManager import EventEnum
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
@@ -142,11 +141,11 @@ class MainPage(QFrame, UIFunctionBase):
                 y=pos.y() + NODE_VERTICAL_SPACING,
                 r=30,
                 commitObj=commitObj,
-                level=self.scene.distance(rootNode.hexSha, commitObj.hexSha),
+                level=self.scene.distance(rootNode.hexSha(), commitObj.hexSha),
             )
 
     def removeSelectedNode(self) -> None:
         selectedNode = self.scene.getSelected()
         if not selectedNode:
             return
-        self.scene.removeGraphic(selectedNode.hexSha)
+        self.scene.removeGraphic(selectedNode.hexSha())

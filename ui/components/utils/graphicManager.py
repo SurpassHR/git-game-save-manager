@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from turtle import width
 from PyQt5.QtGui import QPen, QColor, QBrush
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtCore import QRectF, QPointF, QSizeF, pyqtSlot
@@ -13,8 +14,8 @@ from core.tools.utils.dataStructTools import listDedup
 from core.getGitInfo import CommitObj, GitRepoInfoMgr
 from core.tools.utils.simpleLogger import loggerPrint
 
-from ui.components.graphics.roundNodeGraphic import RoundNodeGraphic
-from ui.components.graphics.edgeLineGraphic import EdgeLineGraphic
+from ui.components.graphics.gCommitNode import GCommitNodeWithLable
+from ui.components.graphics.gEdgeLine import EdgeLineGraphic
 from ui.components.utils.eventManager import EventEnum
 from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.publicDefs.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING, NODE_VERTICAL_SPACING
@@ -23,24 +24,24 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
     def __init__(self, repoPath: str) -> None:
         GitRepoInfoMgr.__init__(self, repoPath)
 
-        self.nodes: dict[str, RoundNodeGraphic] = {}
+        self.nodes: dict[str, GCommitNodeWithLable] = {}
         self.edges: dict[str, EdgeLineGraphic] = {}
-        self.selected: Optional[RoundNodeGraphic] = None
+        self.selected: Optional[GCommitNodeWithLable] = None
 
         self.subscribeEvt()
 
     def boundToScene(self, scene: QGraphicsScene) -> None:
         self.scene = scene
 
-    def setSelected(self, graphicId: str, isSelected: bool):
+    def setSelected(self, graphicHash: str, isSelected: bool):
         if isSelected:
-            self.selected = self.getNode(graphicId)
-            loggerPrint(f"node selected: '{graphicId}'")
+            self.selected = self.getNode(graphicHash)
+            loggerPrint(f"node selected: '{graphicHash}'")
         else:
             self.selected = None
-            loggerPrint(f"node diselected: '{graphicId}'")
+            loggerPrint(f"node diselected: '{graphicHash}'")
 
-    def getSelected(self) -> Optional[RoundNodeGraphic]:
+    def getSelected(self) -> Optional[GCommitNodeWithLable]:
         return self.selected
 
     def isEmpty(self):
@@ -55,13 +56,13 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         level: int,
         border: str | QPen = NODE_BORDER_DEFAULT_PEN,
         fill: str | QBrush = NODE_FILL_DEFAULT_BRUSH,
-    ) -> Optional[RoundNodeGraphic]:
+    ) -> Optional[GCommitNodeWithLable]:
         isNodeExisted = self.nodes.get(commitObj.hexSha, '') != ''
         if isNodeExisted:
             return
 
         # 创建图形
-        round = RoundNodeGraphic(
+        round = GCommitNodeWithLable(
             rect=QRectF(0, 0, r, r),
             selectCb=self.setSelected,
             level=level,
@@ -83,16 +84,16 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         round.setPen(pen)
 
         # 将图形添加到场景
-        self.nodes[round.hexSha] = round
+        self.nodes[round.hexSha()] = round
         if self.scene:
             self.scene.addItem(round)
 
         # 连接父节点与子节点
-        loggerPrint(fr"create node: {round.hexSha} graphic, parents: {round.parents}, level: {round.level}, pos: ({x}, {y}), msg: {round.message}")
+        loggerPrint(fr"create node: {round.hexSha()} graphic, parents: {round.parents()}, level: {round.level()}, pos: ({x}, {y}), msg: {round.message()}")
 
         # 判断是否根节点
-        if len(round.parents) == 0:
-            self.rootNode = round.hexSha
+        if len(round.parents()) == 0:
+            self.rootNode = round.hexSha()
 
         return round
 
@@ -112,13 +113,13 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         self.edges[f"{fromNodeHash}->{toNodeHash}"] = edge
         self.scene.addItem(edge)
 
-    def getNode(self, hexSha: str) -> Optional[RoundNodeGraphic]:
+    def getNode(self, hexSha: str) -> Optional[GCommitNodeWithLable]:
         node = self.nodes.get(hexSha)
         if not node:
             return None
         return node
 
-    def getRootNode(self) -> Optional[RoundNodeGraphic]:
+    def getRootNode(self) -> Optional[GCommitNodeWithLable]:
         node = self.nodes.get(self.rootNode)
         if not node:
             return None
@@ -162,8 +163,8 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
     def getNodesByLevel(self, level: int) -> list[str]:
         nodeList: list[str] = []
         for node in self.nodes.values():
-            if node.level == level:
-                nodeList.append(node.hexSha)
+            if node.level() == level:
+                nodeList.append(node.hexSha())
         return nodeList
 
     def nodeMaxLevel(self) -> int:
@@ -173,7 +174,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             node = self.getNode(nodeHash)
             if not node:
                 continue
-            maxLevel = max(maxLevel, node.level)
+            maxLevel = max(maxLevel, node.level())
 
         return maxLevel
 
@@ -183,7 +184,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         if len(data) != 3:
             return
 
-        node: Optional[RoundNodeGraphic] = data.get("node")
+        node: Optional[GCommitNodeWithLable] = data.get("node")
         posX: Optional[float] = data.get("posX")
         posY: Optional[float] = data.get("posY")
 
@@ -200,8 +201,8 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             nodeB = self.getNode(nodeBHash)
             if not nodeA or not nodeB:
                 return False, None
-            for nodeAParent in nodeA.parents:
-                if nodeAParent in nodeB.parents:
+            for nodeAParent in nodeA.parents():
+                if nodeAParent in nodeB.parents():
                     return True, nodeAParent
             return False, None
 
@@ -236,18 +237,22 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         def arrangeNodeList(nodeList: list[str]):
             baseNode = self.getNode(nodeList[0])
             baseNodePos = self.getNodePosition(nodeList[0])
-            if baseNode is None or baseNodePos is None:
+            baseNodeSize = self.getNodeGraphicSize(nodeList[0])
+            if baseNode is None or baseNodePos is None or baseNodeSize is None:
                 return
 
+            offsetX = baseNodePos.x() + baseNodeSize.width()
             for i, nodeHash in enumerate(nodeList[1:]):
                 node = self.getNode(nodeHash)
-                if not node:
+                nodeSize = self.getNodeGraphicSize(nodeHash)
+                if node is None or nodeSize is None:
                     continue
                 data = {
                     "node": node,
-                    "posX": baseNode.scenePos().x() + NODE_HORIZONTAL_SPACING * (i + 1),
+                    "posX": offsetX + NODE_HORIZONTAL_SPACING * (i + 1),
                     "posY": baseNode.scenePos().y(),
                 }
+                offsetX += nodeSize.width()
                 self.uiEmit(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, data)
 
         # 获取一组节点的外接矩形
@@ -304,9 +309,9 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                 parentNodePos = self.getNodePosition(parent)
                 if parentNode is None or parentNodePos is None:
                     continue
-                if len(parentNode.parents) == 0:
+                if len(parentNode.parents()) == 0:
                     continue
-                grandParent = parentNode.parents[0]
+                grandParent = parentNode.parents()[0]
                 grandParentNodePos = self.getNodePosition(grandParent)
                 if grandParentNodePos is None:
                     continue

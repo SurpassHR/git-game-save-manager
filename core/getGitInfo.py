@@ -16,7 +16,7 @@ class CommitObj:
         self,
         hexSha: str = "",
         author: str | None = "",
-        message: str | bytes = "",
+        message: str = "",
         parents: list[str] = [],
         children: list[str] = [],
         branches: list[str] = [],
@@ -24,7 +24,7 @@ class CommitObj:
     ):
         self.hexSha = hexSha
         self.author = author
-        self.message = message.strip()
+        self.message = str(message.strip())
         self.parents = parents
         self.children = children
         self.branches = branches
@@ -62,7 +62,7 @@ class GitRepoInfoMgr(DAG):
             commitObj = CommitObj(
                 hexSha=hexSha,
                 author=commit.author.name,
-                message=commit.message,
+                message=str(commit.message),
                 children=[],
                 branches=[],
                 commitDate=datetime.fromtimestamp(commit.committed_date).strftime("%Y-%m-%d %H:%M:%S"),
