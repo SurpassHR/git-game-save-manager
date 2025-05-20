@@ -3,6 +3,7 @@ from typing import Callable, Optional
 from PyQt5.QtWidgets import QWidget
 
 from core.tools.utils.simpleLogger import loggerPrint
+from core.tools.utils.configLoader import getConfig, setConfig
 from core.tools.publicDef.levelDefs import LogLevels, MsgBoxLevels
 from ui.components.utils.eventManager import EventManager, EventEnum
 
@@ -14,6 +15,15 @@ class UIFunctionBase:
     def __init__(self) -> None:
         pass
 
+    # UI 中读取配置
+    def uiGetConfig(self, key: str, default: str = "") -> str:
+        return getConfig(key, default)
+
+    # UI 中写入配置
+    def uiSetConfig(self, key: str, val: str) -> bool:
+        return setConfig(key, val)
+
+    # 主窗口弹窗
     def uiShowMsgBox(
         self,
         level: MsgBoxLevels,

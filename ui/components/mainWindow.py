@@ -3,13 +3,15 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 from pathlib import Path
 
-from qfluentwidgets import FluentWindow, NavigationItemPosition
-from qfluentwidgets.common.style_sheet import setThemeColor
+from qfluentwidgets import FluentWindow, NavigationItemPosition, NavigationPushButton
+from qfluentwidgets.common.style_sheet import setTheme, setThemeColor
 from qfluentwidgets.common.icon import FluentIcon
+from qfluentwidgets.common.config import Theme, isDarkTheme
 
 rootPath = str(Path(__file__).resolve().parent.parent)
 sys.path.append(rootPath)
 
+from core.tools.utils.simpleLogger import loggerPrint
 from ui.components.pages.eventGraphPage import EventGraphPage
 from ui.components.pages.configPage import ConfigPage
 from ui.components.utils.uiFunctionBase import UIFunctionBase
@@ -24,9 +26,8 @@ class MainWindow(FluentWindow, UIFunctionBase):
         self.wWidth: int = 1280
         self.wHeight: int = 720
 
-        self.setWindowTitle("PyQt5 GraphicsView Test")
-
-        setThemeColor(self.THEME_COLOR)
+        # 配置主题
+        self.configTheme()
 
         # 设置启动位置
         self.setWindowPosAndSize()
@@ -45,6 +46,34 @@ class MainWindow(FluentWindow, UIFunctionBase):
 
         self.show()
 
+    def configTheme(self):
+        setTheme(Theme.DARK if self.uiGetConfig("them") == "dark" else Theme.LIGHT)
+        setThemeColor(self.THEME_COLOR)
+
+        # 添加导航栏主题切换按钮
+        def toggleTheme() -> None:
+            key: str = "theme"
+
+            if not isDarkTheme():
+                setTheme(Theme.DARK)
+                self.uiSetConfig(key, "dark")
+                loggerPrint("主题切换: light -> dark")
+            else:
+                setTheme(Theme.LIGHT)
+                self.uiSetConfig(key, "light")
+                loggerPrint("主题切换: dark -> light")
+
+        self.navigationInterface.addWidget(
+            routeKey="themeNavigationButton",
+            widget=NavigationPushButton(
+                FluentIcon.CONSTRACT,
+                "主题切换",
+                False
+            ),
+            onClick=toggleTheme,
+            position=NavigationItemPosition.BOTTOM
+        )
+
     def setWindowPosAndSize(self):
         desktop = QApplication.desktop()
         if not desktop:
@@ -60,6 +89,7 @@ class MainWindow(FluentWindow, UIFunctionBase):
     def configTitleBar(self):
         # 隐藏标题栏图标
         self.titleBar.iconLabel.hide()
+        self.setWindowTitle("PyQt5 GraphicsView Test")
 
     def configNaviBar(self):
         # 设置侧边栏宽度
@@ -67,7 +97,6 @@ class MainWindow(FluentWindow, UIFunctionBase):
 
         # 侧边栏默认展开
         self.navigationInterface.setMinimumExpandWidth(self.wWidth)
-        print(self.wWidth)
         self.navigationInterface.expand(useAni = False)
 
         # 隐藏返回按钮
