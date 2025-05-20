@@ -53,7 +53,7 @@ class GCommitNodeWithLable(QGraphicsItemGroup):
 
         if not event:
             return
-        loggerPrint(f"move '{self.hexSha()}': {self.posBeforeMove} -> {self.scenePos()}, parent: {self.parentItem()}")
+        loggerPrint(f"move '{self.hexSha()}': {self.posBeforeMove.x(), self.posBeforeMove.y()} -> {self.scenePos().x(), self.scenePos().y()}, parent: {self.parents()}")
 
     @override
     def setSelected(self, selected: bool) -> None:

@@ -18,7 +18,7 @@ from ui.components.widgets.gridScene import SmartGridScene
 from ui.publicDefs.styleDefs import NODE_VERTICAL_SPACING
 
 
-class MainPage(QFrame, UIFunctionBase):
+class EventGraphPage(QFrame, UIFunctionBase):
     def __init__(self, text: str, window) -> None:
         QFrame.__init__(self, window)
 
@@ -32,7 +32,7 @@ class MainPage(QFrame, UIFunctionBase):
         self.scene = SmartGridScene(self)
 
         view = InfiniteCanvasView(self.scene, self)
-        view.setGeometry(0, 0, 1280, 720)
+        # view.setGeometry(0, 0, 1280, 720)
 
         container.addWidget(view)
 

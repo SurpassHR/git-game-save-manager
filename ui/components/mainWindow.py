@@ -10,52 +10,75 @@ from qfluentwidgets.common.icon import FluentIcon
 rootPath = str(Path(__file__).resolve().parent.parent)
 sys.path.append(rootPath)
 
-from ui.components.pages.mainPage import MainPage
+from ui.components.pages.eventGraphPage import EventGraphPage
+from ui.components.pages.configPage import ConfigPage
 from ui.components.utils.uiFunctionBase import UIFunctionBase
 
 
 class MainWindow(FluentWindow, UIFunctionBase):
-    APP_WIDTH = 1920
-    APP_HEIGHT = 1080
     THEME_COLOR = "#8A95A9"
 
-    def __init__(self, git_manager) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
-        self.git_manager = git_manager
+        self.wWidth: int = 1280
+        self.wHeight: int = 720
+
         self.setWindowTitle("PyQt5 GraphicsView Test")
-        self.resize(self.APP_WIDTH, self.APP_HEIGHT)
 
         setThemeColor(self.THEME_COLOR)
 
+        # 设置启动位置
+        self.setWindowPosAndSize()
+
+        # 配置标题栏
+        self.configTitleBar()
+
+        # 配置导航栏
+        self.configNaviBar()
+
+        # 添加页面
+        self.addPages()
+
+        # 绑定主窗口
+        self.uiSetMainWindow(self)
+
+        self.show()
+
+    def setWindowPosAndSize(self):
+        desktop = QApplication.desktop()
+        if not desktop:
+            exit(-1)
+        desktop = desktop.availableGeometry()
+
+        self.wWidth = int(desktop.width() * 2 / 3)
+        self.wHeight = int(desktop.height() * 2 / 3)
+        self.resize(self.wWidth, self.wHeight)
+        self.setMinimumSize(self.wWidth, self.wHeight)
+        self.move(desktop.width() // 2 - self.width() // 2, desktop.height() // 2 - self.height() // 2)
+
+    def configTitleBar(self):
         # 隐藏标题栏图标
         self.titleBar.iconLabel.hide()
 
-        # 隐藏导航栏
-        # self.navigationInterface.hide()
-
+    def configNaviBar(self):
         # 设置侧边栏宽度
         self.navigationInterface.setExpandWidth(192)
 
         # 侧边栏默认展开
-        self.navigationInterface.setMinimumExpandWidth(self.APP_WIDTH)
+        self.navigationInterface.setMinimumExpandWidth(self.wWidth)
+        print(self.wWidth)
         self.navigationInterface.expand(useAni = False)
 
-        # 设置启动位置
-        desktop = QApplication.desktop()
-        if desktop:
-            desktop = desktop.availableGeometry()
-            self.move(desktop.width()//2 - self.width()//2, desktop.height()//2 - self.height()//2)
-        else:
-            exit(-1)
+        # 隐藏返回按钮
+        self.navigationInterface.panel.setReturnButtonVisible(False)
 
-        self._mainPage = MainPage("_mainPage", self)
-        self._mainPage.git_manager = git_manager
-        self.addSubInterface(self._mainPage, FluentIcon.SETTING, "配置执行", NavigationItemPosition.SCROLL)
+    def addPages(self):
+        self._configPage = ConfigPage("_configPage", self)
+        self.addSubInterface(self._configPage, FluentIcon.SETTING, "配置管理", NavigationItemPosition.SCROLL)
 
-        self.uiSetMainWindow(self)
-
-        self.show()
+        self._eventGraphPage = EventGraphPage("_eventGraphPage", self)
+        self.addSubInterface(self._eventGraphPage, FluentIcon.BROOM, "事件视图", NavigationItemPosition.SCROLL)
 
 
 if __name__ == '__main__':
@@ -64,5 +87,5 @@ if __name__ == '__main__':
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
 
     app = QApplication(sys.argv)
-    mainWindow = MainWindow(None)
+    mainWindow = MainWindow()
     app.exec()
