@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, QRectF, QPoint
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
-from ui.components.widgets.gridScene import SmartGridScene
+from ui.components.widgets.layouts.gridScene import SmartGridScene
 
 class InfiniteCanvasView(QGraphicsView):
     def __init__(self, scene: QGraphicsScene, parent=None):

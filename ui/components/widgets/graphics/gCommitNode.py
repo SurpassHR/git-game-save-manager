@@ -1,19 +1,37 @@
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QGraphicsItem, QGraphicsTextItem, QGraphicsItemGroup, QGraphicsEllipseItem
-from PyQt5.QtCore import QRectF, QPointF, Qt
+from PyQt5.QtCore import QRectF, QPointF, Qt, QPoint
 from PyQt5.QtGui import QBrush, QPen, QColor, QFont, QPainter
-from typing import Callable, override
+from typing import Callable, no_type_check, overload, override, Any, Union
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
 from core.tools.utils.simpleLogger import loggerPrint
 from core.getGitInfo import CommitObj
-from ui.components.graphics.gEdgeLine import EdgeLineGraphic
+from ui.components.widgets.graphics.gEdgeLine import EdgeLineGraphic
+from ui.components.widgets.interfaces import IGraphScene
 
 
-class GCommitNodeWithLable(QGraphicsItemGroup):
+class GCommitNode(QGraphicsEllipseItem, CommitObj):
+    def __init__(self, rect: QRectF, selectCb: Callable, level: int):
+        QGraphicsEllipseItem.__init__(self, rect)
+        CommitObj.__init__(self)
+
+        self.selectCb: Callable = selectCb
+        self.level = level # 表示从根节点到本节点的距离
+        self.connections: list[EdgeLineGraphic] = []
+
+    def setCommitInfo(self, commitObj: CommitObj):
+        for k, v in commitObj.__dict__.items():
+            self.setItem(k, v)
+
+    def addConnection(self, connection):
+        self.connections.append(connection)
+
+
+class GLabeledCommitNode(QGraphicsItemGroup):
     def __init__(self, rect: QRectF, selectCb: Callable, level: int):
         super().__init__()
 
@@ -66,8 +84,7 @@ class GCommitNodeWithLable(QGraphicsItemGroup):
         old_pos = self.pos()
         super().mouseMoveEvent(event)
         if old_pos != self.pos():
-            for edges in self.rectItem.connections:
-                edges.updatePosition()
+            self.updateEdgePos()
         self.updateTextPosition()
 
     @override
@@ -88,6 +105,20 @@ class GCommitNodeWithLable(QGraphicsItemGroup):
         # 调试绘制边界矩形(可选)
         painter.setPen(Qt.GlobalColor.red)
         painter.drawRect(self.boundingRect())
+
+    @no_type_check
+    def setPos(self, *args):
+        if len(args) == 1:
+            super().setPos(args[0])
+        elif len(args) == 2:
+            super().setPos(QPointF(args[0], args[1]))
+        else:
+            raise TypeError("setPos() takes 1 or 2 arguments")
+        self.updateEdgePos()
+
+    def updateEdgePos(self):
+        for edges in self.rectItem.connections:
+            edges.updatePosition()
 
     def updateTextPosition(self):
         # 获取当前尺寸
@@ -136,22 +167,44 @@ class GCommitNodeWithLable(QGraphicsItemGroup):
         y = self.rectItem.scenePos().y() + self.rectItem.boundingRect().height() / 2
         return QPointF(x, y)
 
+    def getNodeGraphicRect(self) -> QRectF:
+        return self.rectItem.sceneBoundingRect()
 
-class GCommitNode(QGraphicsEllipseItem, CommitObj):
-    def __init__(self, rect: QRectF, selectCb: Callable, level: int):
-        QGraphicsEllipseItem.__init__(self, rect)
-        CommitObj.__init__(self)
 
-        self.selectCb: Callable = selectCb
-        self.level = level # 表示从根节点到本节点的距离
-        self.connections: list[EdgeLineGraphic] = []
+class GLabeledColliDetectCommitNode(GLabeledCommitNode):
+    def __init__(self, rect: QRectF, selectCb: Callable[..., Any], level: int):
+        super().__init__(rect, selectCb, level)
 
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        # 设置发送图形变化消息
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
 
-    def setCommitInfo(self, commitObj: CommitObj):
-        for k, v in commitObj.__dict__.items():
-            self.setItem(k, v)
+        # 状态信息
+        self.originalPos = self.pos()
+        self.isDragging = False
 
-    def addConnection(self, connection):
-        self.connections.append(connection)
+    @override
+    def mouseReleaseEvent(self, event):
+        self.isDragging = False
+        super().mouseReleaseEvent(event)
+
+    @override
+    def mousePressEvent(self, event):
+        self.isDragging = True
+        super().mousePressEvent(event)
+
+    @override
+    def itemChange(self, change, value):
+        scene: IGraphScene = self.scene() # type: ignore
+        if scene is None:
+            return super().itemChange(change, value)
+
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+            # 只处理由拖动引起的位置变化
+            if self.isDragging:
+                self.originalPos = self.pos()
+                newPos = value
+                # 如果拖动的是当前项，立即通知场景处理碰撞
+                scene.handleCollisionForDraggedItem(self, newPos)
+
+        # 始终按正常方式更新位置
+        return super().itemChange(change, value)

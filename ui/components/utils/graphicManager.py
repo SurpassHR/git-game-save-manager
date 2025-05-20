@@ -1,6 +1,5 @@
 import sys
 from pathlib import Path
-from turtle import width
 from PyQt5.QtGui import QPen, QColor, QBrush
 from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtCore import QRectF, QPointF, QSizeF, pyqtSlot
@@ -14,19 +13,20 @@ from core.tools.utils.dataStructTools import listDedup
 from core.getGitInfo import CommitObj, GitRepoInfoMgr
 from core.tools.utils.simpleLogger import loggerPrint
 
-from ui.components.graphics.gCommitNode import GCommitNodeWithLable
-from ui.components.graphics.gEdgeLine import EdgeLineGraphic
+from ui.components.widgets.graphics.gCommitNode import GLabeledCommitNode, GLabeledColliDetectCommitNode
+from ui.components.widgets.graphics.gEdgeLine import EdgeLineGraphic
 from ui.components.utils.eventManager import EventEnum
 from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.publicDefs.styleDefs import NODE_BORDER_DEFAULT_PEN, NODE_FILL_DEFAULT_BRUSH, NODE_HORIZONTAL_SPACING, NODE_VERTICAL_SPACING
+
 
 class NodeManager(GitRepoInfoMgr, UIFunctionBase):
     def __init__(self, repoPath: str) -> None:
         GitRepoInfoMgr.__init__(self, repoPath)
 
-        self.nodes: dict[str, GCommitNodeWithLable] = {}
+        self.nodes: dict[str, GLabeledCommitNode] = {}
         self.edges: dict[str, EdgeLineGraphic] = {}
-        self.selected: Optional[GCommitNodeWithLable] = None
+        self.selected: Optional[GLabeledCommitNode] = None
 
         self.subscribeEvt()
 
@@ -41,7 +41,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             self.selected = None
             loggerPrint(f"node diselected: '{graphicHash}'")
 
-    def getSelected(self) -> Optional[GCommitNodeWithLable]:
+    def getSelected(self) -> Optional[GLabeledCommitNode]:
         return self.selected
 
     def isEmpty(self):
@@ -56,13 +56,13 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         level: int,
         border: str | QPen = NODE_BORDER_DEFAULT_PEN,
         fill: str | QBrush = NODE_FILL_DEFAULT_BRUSH,
-    ) -> Optional[GCommitNodeWithLable]:
+    ) -> Optional[GLabeledCommitNode]:
         isNodeExisted = self.nodes.get(commitObj.hexSha, '') != ''
         if isNodeExisted:
             return
 
         # 创建图形
-        round = GCommitNodeWithLable(
+        round = GLabeledColliDetectCommitNode(
             rect=QRectF(0, 0, r, r),
             selectCb=self.setSelected,
             level=level,
@@ -113,13 +113,13 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         self.edges[f"{fromNodeHash}->{toNodeHash}"] = edge
         self.scene.addItem(edge)
 
-    def getNode(self, hexSha: str) -> Optional[GCommitNodeWithLable]:
+    def getNode(self, hexSha: str) -> Optional[GLabeledCommitNode]:
         node = self.nodes.get(hexSha)
         if not node:
             return None
         return node
 
-    def getRootNode(self) -> Optional[GCommitNodeWithLable]:
+    def getRootNode(self) -> Optional[GLabeledCommitNode]:
         node = self.nodes.get(self.rootNode)
         if not node:
             return None
@@ -184,7 +184,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         if len(data) != 3:
             return
 
-        node: Optional[GCommitNodeWithLable] = data.get("node")
+        node: Optional[GLabeledCommitNode] = data.get("node")
         posX: Optional[float] = data.get("posX")
         posY: Optional[float] = data.get("posY")
 

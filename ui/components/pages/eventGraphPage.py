@@ -13,8 +13,8 @@ sys.path.append(rootPath)
 
 from core.getGitInfo import CommitObj
 from ui.components.utils.uiFunctionBase import UIFunctionBase
-from ui.components.widgets.infiniteCanvasView import InfiniteCanvasView
-from ui.components.widgets.gridScene import SmartGridScene
+from ui.components.widgets.layouts.infiniteCanvasView import InfiniteCanvasView
+from ui.components.widgets.layouts.gridScene import ColliDetectSmartScene
 from ui.publicDefs.styleDefs import NODE_VERTICAL_SPACING
 
 
@@ -29,7 +29,7 @@ class EventGraphPage(QFrame, UIFunctionBase):
         self.createUI()
 
     def addScene(self, container: QBoxLayout) -> None:
-        self.scene = SmartGridScene(self)
+        self.scene = ColliDetectSmartScene(self)
 
         view = InfiniteCanvasView(self.scene, self)
         # view.setGeometry(0, 0, 1280, 720)

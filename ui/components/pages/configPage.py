@@ -13,8 +13,8 @@ sys.path.append(rootPath)
 
 from core.getGitInfo import CommitObj
 from ui.components.utils.uiFunctionBase import UIFunctionBase
-from ui.components.widgets.infiniteCanvasView import InfiniteCanvasView
-from ui.components.widgets.gridScene import SmartGridScene
+from ui.components.widgets.layouts.infiniteCanvasView import InfiniteCanvasView
+from ui.components.widgets.layouts.gridScene import SmartGridScene
 from ui.publicDefs.styleDefs import NODE_VERTICAL_SPACING
 
 class ConfigPage(QFrame, UIFunctionBase):

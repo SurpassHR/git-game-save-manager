@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QGraphicsLineItem
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
-from ui.components.graphics.gInterfaces import ICommitNode
+from ui.components.widgets.interfaces import ICommitNode
 
 
 class EdgeLineGraphic(QGraphicsLineItem):
