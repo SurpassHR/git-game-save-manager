@@ -3,7 +3,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import QGraphicsItem, QGraphicsTextItem, QGraphicsItemGroup, QGraphicsEllipseItem
 from PyQt5.QtCore import QRectF, QPointF, Qt
 from PyQt5.QtGui import QBrush, QPen, QColor, QFont, QPainter
-from typing import Callable, no_type_check, override, Any
+from typing import Callable, override, Any, no_type_check
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
@@ -12,6 +12,7 @@ from core.tools.utils.simpleLogger import loggerPrint
 from core.getGitInfo import CommitObj
 from ui.components.widgets.graphics.gEdgeLine import EdgeLineGraphic
 from ui.components.widgets.interfaces import IGraphScene
+from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
 
 
 class GCommitNode(QGraphicsEllipseItem, CommitObj):
@@ -81,10 +82,7 @@ class GLabeledCommitNode(QGraphicsItemGroup):
 
     @override
     def mouseMoveEvent(self, event):
-        old_pos = self.pos()
         super().mouseMoveEvent(event)
-        if old_pos != self.pos():
-            self.updateEdgePos()
         self.updateTextPosition()
 
     @override
@@ -114,11 +112,7 @@ class GLabeledCommitNode(QGraphicsItemGroup):
             super().setPos(QPointF(args[0], args[1]))
         else:
             raise TypeError("setPos() takes 1 or 2 arguments")
-        self.updateEdgePos()
-
-    def updateEdgePos(self):
-        for edges in self.rectItem.connections:
-            edges.updatePosition()
+        self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, {})
 
     def updateTextPosition(self):
         # 获取当前尺寸
@@ -171,7 +165,7 @@ class GLabeledCommitNode(QGraphicsItemGroup):
         return self.rectItem.sceneBoundingRect()
 
 
-class GLabeledColliDetectCommitNode(GLabeledCommitNode):
+class GLabeledColliDetectCommitNode(GLabeledCommitNode, UIFunctionBase):
     def __init__(self, rect: QRectF, selectCb: Callable[..., Any], level: int):
         super().__init__(rect, selectCb, level)
 
@@ -204,7 +198,11 @@ class GLabeledColliDetectCommitNode(GLabeledCommitNode):
                 self.originalPos = self.pos()
                 newPos = value
                 # 如果拖动的是当前项，立即通知场景处理碰撞
-                scene.handleCollisionForDraggedItem(self, newPos)
+                data = {
+                    "draggedItem": self,
+                    "newPos": newPos,
+                }
+                self.uiEmit(EventEnum.UI_COLLISION_SCENE_PROC_DETECT, data)
 
         # 始终按正常方式更新位置
         return super().itemChange(change, value)

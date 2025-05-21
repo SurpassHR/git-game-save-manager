@@ -52,7 +52,7 @@ class UIFunctionBase:
 
     # 订阅事件
     def uiSubscribe(self, event: EventEnum, handler: Callable) -> None:
-        loggerPrint(f"订阅事件: {event.name}", level=LogLevels.DEBUG)
+        loggerPrint(f"订阅事件: {event.name}", level=LogLevels.INFO)
         EventManager.getSingleton().subscribe(event, handler)
 
     # 取消订阅事件

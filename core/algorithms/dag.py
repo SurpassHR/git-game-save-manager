@@ -228,7 +228,7 @@ class DAG(object):
                 toNode=nodeB,
                 path=path,
             )
-        loggerPrint(f"nodeA: '{nodeA}', nodeB: '{nodeB}' - {path}")
+        # loggerPrint(f"nodeA: '{nodeA}', nodeB: '{nodeB}' - {path}")
         return len(path)
 
     def get_all_edges(self, graph = None):
@@ -240,16 +240,18 @@ class DAG(object):
                 edges.append((node, neighbor))
         return edges
 
-    # 获取连接该节点的所有边
-    def nodeNeighbors(self, node: str) -> list[str]:
+    # 获取节点的直接上游节点
+    def upstream(self, node: str) -> list[str]:
         # 所有该节点的直接下游节点
         downStream: list[str] = list(self.graph[node])
         # 非直接下游节点
         excludeDownStream: list[str] = [n for n in self.graph.keys() if n not in downStream]
         # 非直接下游节点中的该节点的直接上游节点
-        upStream: list[str] = [n for n in excludeDownStream if node in self.downstream(n)]
+        return [n for n in excludeDownStream if node in self.downstream(n)]
 
-        return downStream + upStream
+    # 获取直接连接该节点的所有节点
+    def directNodes(self, node: str) -> list[str]:
+        return self.upstream(node) + self.downstream(node)
 
 
 if __name__ == '__main__':
@@ -268,4 +270,4 @@ if __name__ == '__main__':
     # pprint(dag.all_downstreams("b"))
     loggerPrint(f"{dag.distance("b", "e")}")
     loggerPrint(f"{dag.get_all_edges()}")
-    loggerPrint(f"{dag.nodeNeighbors("b")}")
+    loggerPrint(f"{dag.directNodes("b")}")

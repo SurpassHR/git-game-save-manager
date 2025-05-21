@@ -26,9 +26,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
         self.nodes: dict[str, GLabeledCommitNode] = {}
         self.edges: dict[str, EdgeLineGraphic] = {}
-        self.selected: Optional[GLabeledCommitNode] = None
-
-        self.subscribeEvt()
+        self.selected: Optional[GLabeledCommitNode] = None # 当前认为一个 scene 内任意时刻有且仅有一个节点会被选中
 
     def boundToScene(self, scene: QGraphicsScene) -> None:
         self.scene = scene
@@ -89,7 +87,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             self.scene.addItem(round)
 
         # 连接父节点与子节点
-        loggerPrint(fr"create node: {round.hexSha()} graphic, parents: {round.parents()}, level: {round.level()}, pos: ({x}, {y}), msg: {round.message()}")
+        # loggerPrint(fr"create node: {round.hexSha()} graphic, parents: {round.parents()}, level: {round.level()}, pos: ({x}, {y}), msg: {round.message()}")
 
         # 判断是否根节点
         if len(round.parents()) == 0:
@@ -107,7 +105,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         if fromNode is None or toNode is None:
             return
 
-        edge = EdgeLineGraphic(fromNode, toNode)
+        edge = EdgeLineGraphic(fromNode.getNodeGraphicCenter(), toNode.getNodeGraphicCenter())
         fromNode.addConnection(edge)
         toNode.addConnection(edge)
         self.edges[f"{fromNodeHash}->{toNodeHash}"] = edge
@@ -192,7 +190,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             return
 
         node.setPos(posX, posY)
-        self._forceUpdateAllEdges()
+        self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, {})
 
     @pyqtSlot(EventEnum, dict)
     def _logicEvt_arrangeNodeGraphics(self, _: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):
@@ -232,7 +230,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                     "posX": node.scenePos().x() + alphaX,
                     "posY": node.scenePos().y() + alphaY,
                 }
-                self.uiEmit(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, data)
+                self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOVE_NODE, data)
 
         def arrangeNodeList(nodeList: list[str]):
             baseNode = self.getNode(nodeList[0])
@@ -253,7 +251,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                     "posY": baseNode.scenePos().y(),
                 }
                 offsetX += nodeSize.width()
-                self.uiEmit(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, data)
+                self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOVE_NODE, data)
 
         # 获取一组节点的外接矩形
         def getNodeListBoundingRect(nodeList: list[str]) -> QRectF:
@@ -332,10 +330,34 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                 level=LogLevels.DEBUG,
             )
 
-    def _forceUpdateAllEdges(self):
-        for edge in self.edges.values():
-            edge.updatePosition()
+    @pyqtSlot(EventEnum, dict)
+    def _uiEvt_mouseMoveNode(self, _: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):
+        nodeToProc = self.selected
+        if data != {}:
+            nodeToProc = data.get("nodeToMove")
+
+        if nodeToProc is None:
+            return
+
+        nodeToProcHash = nodeToProc.hexSha()
+        # 找到该节点涉及的所有边，并使这些边更新位置
+        upstreamNodeHash: list[str] = self.upstream(nodeToProcHash)
+        for nodeHash in upstreamNodeHash:
+            inEdge = self.getEdge(nodeHash, nodeToProcHash)
+            upNode = self.getNode(nodeHash)
+            if inEdge is None or upNode is None:
+                continue
+            inEdge.updatePosition(upNode.getNodeGraphicCenter(), nodeToProc.getNodeGraphicCenter())
+
+        downstreamNodeHash: list[str] = self.downstream(nodeToProcHash)
+        for nodeHash in downstreamNodeHash:
+            outEdge = self.getEdge(nodeToProcHash, nodeHash)
+            downNode = self.getNode(nodeHash)
+            if outEdge is None or downNode is None:
+                continue
+            outEdge.updatePosition(nodeToProc.getNodeGraphicCenter(), downNode.getNodeGraphicCenter())
 
     def subscribeEvt(self):
         self.uiSubscribe(EventEnum.LOGIC_GRAPHIC_MANAGER_ARRANGE_NODES, self._logicEvt_arrangeNodeGraphics)
-        self.uiSubscribe(EventEnum.UI_GRAPHIC_MANAGER_MOVE_NODE, self._uiEvt_moveNode)
+        self.uiSubscribe(EventEnum.UI_GRAPHIC_MGR_MOVE_NODE, self._uiEvt_moveNode)
+        self.uiSubscribe(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, self._uiEvt_mouseMoveNode)

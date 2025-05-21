@@ -9,8 +9,9 @@ rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
 from ui.components.widgets.layouts.gridScene import SmartGridScene
+from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
 
-class InfiniteCanvasView(QGraphicsView):
+class InfiniteCanvasView(QGraphicsView, UIFunctionBase):
     def __init__(self, scene: QGraphicsScene, parent=None):
         super().__init__(parent)
         self.setScene(scene)
@@ -19,6 +20,7 @@ class InfiniteCanvasView(QGraphicsView):
         # 视图控制参数
         self._pan_start = QPoint()
         self._panning = False
+        self._draggingItem = False
         self.scale_factor = 1.0
 
         # 强制显示滚动条（视觉上更一致）
@@ -53,8 +55,10 @@ class InfiniteCanvasView(QGraphicsView):
         self.scale_factor *= zoom_factor
 
     def procItemPress(self, event):
-        # 如果点击了可移动项，交给默认处理
         super().mousePressEvent(event)
+        # 如果点击了可移动项，交给默认处理
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._draggingItem = True
 
     def procScenePress(self, event):
         # 否则处理为画布拖拽
@@ -98,6 +102,8 @@ class InfiniteCanvasView(QGraphicsView):
 
     def procItemMove(self, event):
         super().mouseMoveEvent(event)
+        if self._draggingItem:
+            self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, {})
 
     @override
     def mouseMoveEvent(self, event):
@@ -112,6 +118,7 @@ class InfiniteCanvasView(QGraphicsView):
         event.accept()
 
     def procItemRelease(self, event):
+        self._draggingItem = False
         super().mouseReleaseEvent(event)
 
     @override

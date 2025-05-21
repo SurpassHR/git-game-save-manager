@@ -1,14 +1,16 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsScene, QGraphicsItem
 from PyQt5.QtGui import QPen, QColor
-from PyQt5.QtCore import Qt, QLineF, QPointF
+from PyQt5.QtCore import Qt, QLineF, QPointF, pyqtSlot
 from pathlib import Path
+from typing import Optional
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
 from ui.components.utils.graphicManager import NodeManager
-from ui.components.utils.uiFunctionBase import UIFunctionBase
+from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
+from ui.components.widgets.graphics.gCommitNode import GLabeledColliDetectCommitNode
 from ui.components.widgets.interfaces import ICommitNode
 
 
@@ -91,10 +93,21 @@ class ColliDetectSmartScene(SmartGridScene):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.isProcessingCollision = False
+        self.subscribeEvt()
 
     # 处理拖动项的碰撞
-    def handleCollisionForDraggedItem(self, draggedItem, newPos):
+    @pyqtSlot(EventEnum, dict)
+    def _uiEvt_handleCollisionForDraggedItem(self, _: EventEnum, data: dict):
         if self.isProcessingCollision:
+            return
+
+        if len(data) != 2:
+            return
+
+        draggedItem: Optional[GLabeledColliDetectCommitNode] = data.get("draggedItem")
+        newPos: Optional[QPointF] = data.get("newPos")
+
+        if draggedItem is None or newPos is None:
             return
 
         self.isProcessingCollision = True
@@ -112,58 +125,60 @@ class ColliDetectSmartScene(SmartGridScene):
         finally:
             self.isProcessingCollision = False
 
-    def distanceSquare(self, item: ICommitNode, draggedItem: ICommitNode):
-        item1Center = item.getNodeGraphicRect().center()
-        item2Center = draggedItem.getNodeGraphicRect().center()
+    def distanceSquare(self, node: ICommitNode, draggedNode: ICommitNode):
+        node1Center = node.getNodeGraphicRect().center()
+        node2Center = draggedNode.getNodeGraphicRect().center()
 
-        return int(item1Center.x() - item2Center.x()) ** 2 + int(item1Center.y() - item2Center.y()) ** 2
+        return int(node1Center.x() - node2Center.x()) ** 2 + int(node1Center.y() - node2Center.y()) ** 2
 
     # 迭代解决场景中所有碰撞
-    def resolveAllCollisions(self, draggedItem):
+    def resolveAllCollisions(self, draggedNode):
         maxIterations = 3  # 限制最大迭代次数
 
         # 创建要处理的项列表
-        itemsToCheck: list[QGraphicsItem] = list(self.items())
-        itemsToCheck = [item for item in itemsToCheck if isinstance(item, ICommitNode)]
+        nodesToCheck: list[QGraphicsItem] = list(self.items())
+        nodesToCheck = [node for node in nodesToCheck if isinstance(node, ICommitNode)]
 
         # 主循环
         for iteration in range(maxIterations):
             collisionFound = False
 
             # 检查每个项的碰撞
-            for i, item1 in enumerate(itemsToCheck):
+            for i, node1 in enumerate(nodesToCheck):
                 # 只检查可移动的矩形项
-                if not isinstance(item1, ICommitNode):
+                if not isinstance(node1, ICommitNode):
                     continue
 
                 # 跳过被拖动的项（它不应该被推动）
-                if item1 == draggedItem:
+                if node1 == draggedNode:
                     continue
 
                 # 找出碰撞
-                collidingItems = []
-                for item2 in itemsToCheck:
-                    if (item2 != item1 and isinstance(item2, ICommitNode) and item1.collidesWithItem(item2)):
-                        collidingItems.append(item2)
+                collidingNodes = []
+                for node2 in nodesToCheck:
+                    if (node2 != node1 and isinstance(node2, ICommitNode) and node1.collidesWithItem(node2)):
+                        collidingNodes.append(node2)
 
-                if not collidingItems:
+                if not collidingNodes:
                     continue
 
                 collisionFound = True
 
                 # 对于每个碰撞，计算和应用推动向量
-                for item2 in collidingItems:
+                for node2 in collidingNodes:
                     # 确定哪一个是固定的，哪一个应该移动
-                    itemToMove, itemToFixed = self.determineMoveAndFixedItems(item1, item2, draggedItem)
-                    if itemToMove is None or itemToFixed is None:
+                    nodeToMove, nodeToFixed = self.determineMoveAndFixedNodes(node1, node2, draggedNode)
+                    if nodeToMove is None or nodeToFixed is None:
                         continue
 
                     # 计算推动向量
-                    pushVector = self.calculatePushVector(itemToMove, itemToFixed)
+                    pushVector = self.calculatePushVector(nodeToMove, nodeToFixed)
                     if pushVector is not None:
                         # 应用推动向量
-                        targetPos = itemToMove.pos() + pushVector
-                        itemToMove.setPos(targetPos)
+                        targetPos = nodeToMove.pos() + pushVector
+                        nodeToMove.setPos(targetPos)
+                        data = { "nodeToMove": nodeToMove }
+                        self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, data)
 
             # 如果没有找到碰撞，可以提前退出
             if not collisionFound:
@@ -172,56 +187,56 @@ class ColliDetectSmartScene(SmartGridScene):
         # 结束处理
 
     # 确定哪个项应该移动，哪个应该保持固定
-    def determineMoveAndFixedItems(self, item1: ICommitNode, item2: ICommitNode, draggedItem: ICommitNode):
+    def determineMoveAndFixedNodes(self, node1: ICommitNode, node2: ICommitNode, draggedNode: ICommitNode):
         # 拖动的项始终是固定的
-        if item1 == draggedItem:
-            return item2, item1
-        elif item2 == draggedItem:
-            return item1, item2
+        if node1 == draggedNode:
+            return node2, node1
+        elif node2 == draggedNode:
+            return node1, node2
 
         # 其他情况下，如果一个被选中一个没有，移动未选中的
-        if item1.isSelected() and not item2.isSelected():
-            return item2, item1
-        elif item2.isSelected() and not item1.isSelected():
-            return item1, item2
+        if node1.isSelected() and not node2.isSelected():
+            return node2, node1
+        elif node2.isSelected() and not node1.isSelected():
+            return node1, node2
 
         # 两者都未被选中，与 draggedItem 接触的不移动，未接触的移动
-        if item1.getNodeGraphicRect().intersects(draggedItem.getNodeGraphicRect()):
-            return item2, item1
-        elif item2.getNodeGraphicRect().intersects(draggedItem.getNodeGraphicRect()):
-            return item1, item2
+        if node1.getNodeGraphicRect().intersects(draggedNode.getNodeGraphicRect()):
+            return node2, node1
+        elif node2.getNodeGraphicRect().intersects(draggedNode.getNodeGraphicRect()):
+            return node1, node2
 
         # 两者都被选中或都未被选中，选择距离被选中者较远的移动
-        dist1 = self.distanceSquare(item1, draggedItem)
-        dist2 = self.distanceSquare(item2, draggedItem)
+        dist1 = self.distanceSquare(node1, draggedNode)
+        dist2 = self.distanceSquare(node2, draggedNode)
         if dist1 < dist2:
-            return item2, item1
+            return node2, node1
         else:
-            return item1, item2
+            return node1, node2
 
     # 计算推动向量
-    def calculatePushVector(self, itemToMove: ICommitNode, itemToFixed: ICommitNode):
-        itemToMoveRect = itemToMove.getNodeGraphicRect()
-        itemToFixedRect = itemToFixed.getNodeGraphicRect()
+    def calculatePushVector(self, nodeToMove: ICommitNode, nodeToFixed: ICommitNode):
+        nodeToMoveRect = nodeToMove.getNodeGraphicRect()
+        nodeToFixedRect = nodeToFixed.getNodeGraphicRect()
 
         # 确保矩形实际重叠
-        if not itemToMoveRect.intersects(itemToFixedRect):
+        if not nodeToMoveRect.intersects(nodeToFixedRect):
             return None
 
         # 交集矩形
-        intersection = itemToMoveRect.intersected(itemToFixedRect)
+        intersection = nodeToMoveRect.intersected(nodeToFixedRect)
 
         # 如果交集无效，返回None
         if intersection.isEmpty() or intersection.width() <= 0 or intersection.height() <= 0:
             return None
 
         # 计算物体中心点
-        movedItemCenter = itemToMoveRect.center()
-        fixedItemCenter = itemToFixedRect.center()
+        movedNodeCenter = nodeToMoveRect.center()
+        fixedNodeCenter = nodeToFixedRect.center()
 
         # 方向向量（从固定物体指向移动物体）
-        dx = movedItemCenter.x() - fixedItemCenter.x()
-        dy = movedItemCenter.y() - fixedItemCenter.y()
+        dx = movedNodeCenter.x() - fixedNodeCenter.x()
+        dy = movedNodeCenter.y() - fixedNodeCenter.y()
 
         # 避免除零错误
         if abs(dx) < 0.1 and abs(dy) < 0.1:
@@ -239,3 +254,7 @@ class ColliDetectSmartScene(SmartGridScene):
             alphaY = intersection.height() * (1 if dy > 0 else -1)
 
         return QPointF(alphaX, alphaY)
+
+    def subscribeEvt(self):
+        super().subscribeEvt()
+        self.uiSubscribe(EventEnum.UI_COLLISION_SCENE_PROC_DETECT, self._uiEvt_handleCollisionForDraggedItem)

@@ -32,7 +32,9 @@ class EventEnum(IntEnum):
     # UI事件线程
     # UI 绘制相关事件，不能在子线程中执行
     UI_EVENT_START = 0x1000
-    UI_GRAPHIC_MANAGER_MOVE_NODE = 0x1001 # 图形管理移动节点图形
+    UI_GRAPHIC_MGR_MOVE_NODE = 0x1001 # 图形管理移动节点图形
+    UI_GRAPHIC_MGR_MOUSE_MOVE_NODE = 0x1002 # 鼠标移动节点图形（由于图形管理维护所有的节点和边，所以在此进行处理）
+    UI_COLLISION_SCENE_PROC_DETECT = 0x1003 # 场景处理节点碰撞
     UI_EVENT_END = 0x1FFF
 
 
