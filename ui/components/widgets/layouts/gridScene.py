@@ -11,7 +11,6 @@ sys.path.append(rootPath)
 from ui.components.utils.graphicManager import NodeManager
 from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
 from ui.components.widgets.graphics.gCommitNode import GLabeledColliDetectCommitNode
-from ui.components.widgets.interfaces import ICommitNode
 
 
 class GridScene(NodeManager, QGraphicsScene, UIFunctionBase):
@@ -125,7 +124,7 @@ class ColliDetectSmartScene(SmartGridScene):
         finally:
             self.isProcessingCollision = False
 
-    def distanceSquare(self, node: ICommitNode, draggedNode: ICommitNode):
+    def distanceSquare(self, node: GLabeledColliDetectCommitNode, draggedNode: GLabeledColliDetectCommitNode):
         node1Center = node.getNodeGraphicRect().center()
         node2Center = draggedNode.getNodeGraphicRect().center()
 
@@ -137,7 +136,7 @@ class ColliDetectSmartScene(SmartGridScene):
 
         # 创建要处理的项列表
         nodesToCheck: list[QGraphicsItem] = list(self.items())
-        nodesToCheck = [node for node in nodesToCheck if isinstance(node, ICommitNode)]
+        nodesToCheck = [node for node in nodesToCheck if isinstance(node, GLabeledColliDetectCommitNode)]
 
         # 主循环
         for iteration in range(maxIterations):
@@ -146,7 +145,7 @@ class ColliDetectSmartScene(SmartGridScene):
             # 检查每个项的碰撞
             for i, node1 in enumerate(nodesToCheck):
                 # 只检查可移动的矩形项
-                if not isinstance(node1, ICommitNode):
+                if not isinstance(node1, GLabeledColliDetectCommitNode):
                     continue
 
                 # 跳过被拖动的项（它不应该被推动）
@@ -156,7 +155,7 @@ class ColliDetectSmartScene(SmartGridScene):
                 # 找出碰撞
                 collidingNodes = []
                 for node2 in nodesToCheck:
-                    if (node2 != node1 and isinstance(node2, ICommitNode) and node1.collidesWithItem(node2)):
+                    if (node2 != node1 and isinstance(node2, GLabeledColliDetectCommitNode) and node1.collidesWithItem(node2)):
                         collidingNodes.append(node2)
 
                 if not collidingNodes:
@@ -187,7 +186,7 @@ class ColliDetectSmartScene(SmartGridScene):
         # 结束处理
 
     # 确定哪个项应该移动，哪个应该保持固定
-    def determineMoveAndFixedNodes(self, node1: ICommitNode, node2: ICommitNode, draggedNode: ICommitNode):
+    def determineMoveAndFixedNodes(self, node1: GLabeledColliDetectCommitNode, node2: GLabeledColliDetectCommitNode, draggedNode: GLabeledColliDetectCommitNode):
         # 拖动的项始终是固定的
         if node1 == draggedNode:
             return node2, node1
@@ -215,7 +214,7 @@ class ColliDetectSmartScene(SmartGridScene):
             return node1, node2
 
     # 计算推动向量
-    def calculatePushVector(self, nodeToMove: ICommitNode, nodeToFixed: ICommitNode):
+    def calculatePushVector(self, nodeToMove: GLabeledColliDetectCommitNode, nodeToFixed: GLabeledColliDetectCommitNode):
         nodeToMoveRect = nodeToMove.getNodeGraphicRect()
         nodeToFixedRect = nodeToFixed.getNodeGraphicRect()
 

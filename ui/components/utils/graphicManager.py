@@ -106,8 +106,6 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             return
 
         edge = EdgeLineGraphic(fromNode.getNodeGraphicCenter(), toNode.getNodeGraphicCenter())
-        fromNode.addConnection(edge)
-        toNode.addConnection(edge)
         self.edges[f"{fromNodeHash}->{toNodeHash}"] = edge
         self.scene.addItem(edge)
 
@@ -190,7 +188,8 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
             return
 
         node.setPos(posX, posY)
-        self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, {})
+        data = { "nodeToMove": node }
+        self.uiEmit(EventEnum.UI_GRAPHIC_MGR_MOUSE_MOVE_NODE, data)
 
     @pyqtSlot(EventEnum, dict)
     def _logicEvt_arrangeNodeGraphics(self, _: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):

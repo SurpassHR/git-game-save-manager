@@ -10,8 +10,6 @@ sys.path.append(rootPath)
 
 from core.tools.utils.simpleLogger import loggerPrint
 from core.getGitInfo import CommitObj
-from ui.components.widgets.graphics.gEdgeLine import EdgeLineGraphic
-from ui.components.widgets.interfaces import IGraphScene
 from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
 
 
@@ -22,14 +20,10 @@ class GCommitNode(QGraphicsEllipseItem, CommitObj):
 
         self.selectCb: Callable = selectCb
         self.level = level # 表示从根节点到本节点的距离
-        self.connections: list[EdgeLineGraphic] = []
 
     def setCommitInfo(self, commitObj: CommitObj):
         for k, v in commitObj.__dict__.items():
             self.setItem(k, v)
-
-    def addConnection(self, connection):
-        self.connections.append(connection)
 
 
 class GLabeledCommitNode(QGraphicsItemGroup):
@@ -131,9 +125,6 @@ class GLabeledCommitNode(QGraphicsItemGroup):
         self.textItem.setPlainText(commitObj.message)
         self.updateTextPosition()
 
-    def addConnection(self, connection):
-        self.rectItem.addConnection(connection)
-
     def setBrush(self, brush: QBrush):
         self.rectItem.setBrush(brush)
 
@@ -188,10 +179,6 @@ class GLabeledColliDetectCommitNode(GLabeledCommitNode, UIFunctionBase):
 
     @override
     def itemChange(self, change, value):
-        scene: IGraphScene = self.scene() # type: ignore
-        if scene is None:
-            return super().itemChange(change, value)
-
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
             # 只处理由拖动引起的位置变化
             if self.isDragging:
