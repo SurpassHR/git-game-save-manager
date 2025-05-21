@@ -115,15 +115,15 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
     def getNode(self, hexSha: str) -> Optional[GLabeledCommitNode]:
         node = self.nodes.get(hexSha)
-        if not node:
-            return None
         return node
 
     def getRootNode(self) -> Optional[GLabeledCommitNode]:
         node = self.nodes.get(self.rootNode)
-        if not node:
-            return None
         return node
+
+    def getEdge(self, startNode: str, endNode: str) -> Optional[EdgeLineGraphic]:
+        key: str = f"{startNode}->{endNode}"
+        return self.edges.get(key)
 
     def getNodePosition(self, hexSha: str) -> Optional[QPointF]:
         node = self.nodes.get(hexSha)

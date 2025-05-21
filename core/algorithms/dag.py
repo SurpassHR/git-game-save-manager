@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 from collections import OrderedDict, defaultdict
 from copy import copy, deepcopy
-from rich.pretty import pprint
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
@@ -241,6 +240,18 @@ class DAG(object):
                 edges.append((node, neighbor))
         return edges
 
+    # 获取连接该节点的所有边
+    def nodeNeighbors(self, node: str) -> list[str]:
+        # 所有该节点的直接下游节点
+        downStream: list[str] = list(self.graph[node])
+        # 非直接下游节点
+        excludeDownStream: list[str] = [n for n in self.graph.keys() if n not in downStream]
+        # 非直接下游节点中的该节点的直接上游节点
+        upStream: list[str] = [n for n in excludeDownStream if node in self.downstream(n)]
+
+        return downStream + upStream
+
+
 if __name__ == '__main__':
     dag = DAG()
     dag.add_node("a")
@@ -253,7 +264,8 @@ if __name__ == '__main__':
     dag.add_edge("b", "c")
     dag.add_edge("c", "e")
     # pprint(dag.topological_sort())
-    pprint(dag.graph)
+    loggerPrint(f"{dag.graph}")
     # pprint(dag.all_downstreams("b"))
-    pprint(dag.distance("b", "e"))
-    pprint(dag.get_all_edges())
+    loggerPrint(f"{dag.distance("b", "e")}")
+    loggerPrint(f"{dag.get_all_edges()}")
+    loggerPrint(f"{dag.nodeNeighbors("b")}")

@@ -3,6 +3,7 @@ from pathlib import Path
 from PyQt5.QtWidgets import QGraphicsView, QGraphicsItem, QGraphicsScene
 from PyQt5.QtGui import QPainter
 from PyQt5.QtCore import Qt, QRectF, QPoint
+from typing import override
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
@@ -37,6 +38,7 @@ class InfiniteCanvasView(QGraphicsView):
             return
         scene.setSceneRect(QRectF(-1e6, -1e6, 2e6, 2e6))
 
+    @override
     def wheelEvent(self, event):
         # 缩放控制（保持之前实现）
         zoom_in_factor = 1.2
@@ -50,54 +52,76 @@ class InfiniteCanvasView(QGraphicsView):
         self.scale(zoom_factor, zoom_factor)
         self.scale_factor *= zoom_factor
 
+    def procItemPress(self, event):
+        # 如果点击了可移动项，交给默认处理
+        super().mousePressEvent(event)
+
+    def procScenePress(self, event):
+        # 否则处理为画布拖拽
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._panning = True
+            self._pan_start = event.pos()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            scene = self.scene()
+            if not scene:
+                return
+            if isinstance(scene, SmartGridScene):
+                scene.clearAllSelectedGraphic()
+                scene.clearSelection()
+            event.accept()
+
+    @override
     def mousePressEvent(self, event):
         if not event:
             return
+
         clickedItem = self.itemAt(event.pos())
         if clickedItem and (clickedItem.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable != 0):
-            # 如果点击了可移动项，交给默认处理
-            self._dragging_item = clickedItem
-            super().mousePressEvent(event)
+            self.procItemPress(event)
         else:
-            # 否则处理为画布拖拽
-            if event.button() == Qt.MouseButton.LeftButton:
-                self._panning = True
-                self._pan_start = event.pos()
-                self.setCursor(Qt.CursorShape.ClosedHandCursor)
-                scene = self.scene()
-                if not scene:
-                    return
-                if isinstance(scene, SmartGridScene):
-                    scene.clearAllSelectedGraphic()
-                    scene.clearSelection()
-                event.accept()
+            self.procScenePress(event)
 
+    def procSceneMove(self, event):
+        # 计算移动距离
+        delta = event.pos() - self._pan_start
+        self._pan_start = event.pos()
+
+        # 直接移动视图内容（不依赖滚动条）
+        h_bar = self.horizontalScrollBar()
+        v_bar = self.verticalScrollBar()
+        if not h_bar or not v_bar:
+            return
+        h_bar.setValue(h_bar.value() - delta.x())
+        v_bar.setValue(v_bar.value() - delta.y())
+
+        event.accept()
+
+    def procItemMove(self, event):
+        super().mouseMoveEvent(event)
+
+    @override
     def mouseMoveEvent(self, event):
         if self._panning and event:
-            # 计算移动距离
-            delta = event.pos() - self._pan_start
-            self._pan_start = event.pos()
-
-            # 直接移动视图内容（不依赖滚动条）
-            h_bar = self.horizontalScrollBar()
-            v_bar = self.verticalScrollBar()
-            if not h_bar or not v_bar:
-                return
-            h_bar.setValue(h_bar.value() - delta.x())
-            v_bar.setValue(v_bar.value() - delta.y())
-
-            event.accept()
+            self.procSceneMove(event)
         else:
-            super().mouseMoveEvent(event)
+            self.procItemMove(event)
 
+    def procSceneRelease(self, event):
+        self._panning = False
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        event.accept()
+
+    def procItemRelease(self, event):
+        super().mouseReleaseEvent(event)
+
+    @override
     def mouseReleaseEvent(self, event):
         if event and event.button() == Qt.MouseButton.LeftButton and self._panning:
-            self._panning = False
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-            event.accept()
+            self.procSceneRelease(event)
         else:
-            super().mouseReleaseEvent(event)
+            self.procItemRelease(event)
 
+    @override
     def showEvent(self, event):
         # 确保视图初始化后滚动条可用
         self.centerOn(0, 0)

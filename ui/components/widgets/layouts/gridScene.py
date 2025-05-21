@@ -7,7 +7,6 @@ from pathlib import Path
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
-from core.tools.utils.simpleLogger import loggerPrint
 from ui.components.utils.graphicManager import NodeManager
 from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.components.widgets.interfaces import ICommitNode
@@ -112,38 +111,12 @@ class ColliDetectSmartScene(SmartGridScene):
 
         finally:
             self.isProcessingCollision = False
-        # self.finalCheckIntersect(draggedItem)
 
     def distanceSquare(self, item: ICommitNode, draggedItem: ICommitNode):
         item1Center = item.getNodeGraphicRect().center()
         item2Center = draggedItem.getNodeGraphicRect().center()
-        # loggerPrint(f"itemCenter: {item1Center} draggedItemCenter: {item2Center}")
 
         return int(item1Center.x() - item2Center.x()) ** 2 + int(item1Center.y() - item2Center.y()) ** 2
-
-    def finalCheckIntersect(self, draggedItem: ICommitNode):
-        itersectDict = {}
-        cnt = 0
-        items_to_check: list[ICommitNode] = list(self.items()) # type: ignore
-        checkedPair: list[tuple[ICommitNode, ICommitNode]] = []
-        for i, item1 in enumerate(items_to_check):
-            item1RectF = item1.getNodeGraphicRect()
-            for item2 in items_to_check:
-                if item1.hexSha() == item2.hexSha():
-                    continue
-                item2RectF = item2.getNodeGraphicRect()
-                intersectRect = item1RectF.intersected(item2RectF)
-                if (item1, item2) in checkedPair or (item2, item1) in checkedPair:
-                    continue
-                if intersectRect.width() > 20 or intersectRect.height() > 20:
-                    itersectDict[cnt] = [item1.hexSha(), item2.hexSha()]
-                    cnt += 1
-                    # moveItem, fixedItem = self.determineMoveAndFixedItems(item1, item2, draggedItem)
-                    # targetPos = self.calculatePushVector(fixedItem, moveItem)
-                    # moveItem.setPos(targetPos)
-                    # checkedPair.append((item1, item2))
-        if itersectDict != {}:
-            loggerPrint(itersectDict)
 
     # 迭代解决场景中所有碰撞
     def resolveAllCollisions(self, draggedItem):
@@ -152,9 +125,6 @@ class ColliDetectSmartScene(SmartGridScene):
         # 创建要处理的项列表
         itemsToCheck: list[QGraphicsItem] = list(self.items())
         itemsToCheck = [item for item in itemsToCheck if isinstance(item, ICommitNode)]
-
-        # 标记哪些项是被处理过的
-        # processedItems = set()
 
         # 主循环
         for iteration in range(maxIterations):
@@ -205,29 +175,17 @@ class ColliDetectSmartScene(SmartGridScene):
     def determineMoveAndFixedItems(self, item1: ICommitNode, item2: ICommitNode, draggedItem: ICommitNode):
         # 拖动的项始终是固定的
         if item1 == draggedItem:
-            # loggerPrint(f"move {item2.hexSha()} fixed {item1.hexSha()}")
             return item2, item1
         elif item2 == draggedItem:
-            # loggerPrint(f"move {item1.hexSha()} fixed {item2.hexSha()}")
             return item1, item2
 
         # 其他情况下，如果一个被选中一个没有，移动未选中的
         if item1.isSelected() and not item2.isSelected():
-            # loggerPrint(f"move {item2.hexSha()} fixed {item1.hexSha()}")
             return item2, item1
         elif item2.isSelected() and not item1.isSelected():
-            # loggerPrint(f"move {item1.hexSha()} fixed {item2.hexSha()}")
             return item1, item2
 
-        # 两者都被选中或都未被选中，选择索引较大的（更晚添加到场景中的）移动
-        # allItems = self.items()
-        # if allItems.index(item1) > allItems.index(item2):
-        #     return item1, item2
-        # else:
-        #     return item2, item1
-
         # 两者都未被选中，与 draggedItem 接触的不移动，未接触的移动
-        # loggerPrint(f"{item1.message()} {item1.getNodeGraphicRect().intersects(draggedItem.getNodeGraphicRect())} {item2.message()} {item2.getNodeGraphicRect().intersects(draggedItem.getNodeGraphicRect())}")
         if item1.getNodeGraphicRect().intersects(draggedItem.getNodeGraphicRect()):
             return item2, item1
         elif item2.getNodeGraphicRect().intersects(draggedItem.getNodeGraphicRect()):
@@ -237,22 +195,17 @@ class ColliDetectSmartScene(SmartGridScene):
         dist1 = self.distanceSquare(item1, draggedItem)
         dist2 = self.distanceSquare(item2, draggedItem)
         if dist1 < dist2:
-            # loggerPrint(f"item2 dist {dist2} item1 dist {dist1}")
-            # loggerPrint(f"move {item2.message()} fixed {item1.message()}")
             return item2, item1
         else:
-            # loggerPrint(f"move {item1.message()} fixed {item2.message()}")
             return item1, item2
 
     # 计算推动向量
     def calculatePushVector(self, itemToMove: ICommitNode, itemToFixed: ICommitNode):
-        # loggerPrint(f"proc {itemToMove.hexSha()} {itemToFixed.hexSha()} collision")
         itemToMoveRect = itemToMove.getNodeGraphicRect()
         itemToFixedRect = itemToFixed.getNodeGraphicRect()
 
         # 确保矩形实际重叠
         if not itemToMoveRect.intersects(itemToFixedRect):
-            # loggerPrint(f"{itemToMove.hexSha()} not interset with {itemToFixed.hexSha()}")
             return None
 
         # 交集矩形
@@ -260,7 +213,6 @@ class ColliDetectSmartScene(SmartGridScene):
 
         # 如果交集无效，返回None
         if intersection.isEmpty() or intersection.width() <= 0 or intersection.height() <= 0:
-            # loggerPrint(f"{itemToMove.hexSha()} not interset with {itemToFixed.hexSha()}")
             return None
 
         # 计算物体中心点
@@ -286,5 +238,4 @@ class ColliDetectSmartScene(SmartGridScene):
             alphaX = 0
             alphaY = intersection.height() * (1 if dy > 0 else -1)
 
-        # loggerPrint(f"{itemToFixed.hexSha()} push {itemToMove.hexSha()} to {alphaX, alphaY}")
         return QPointF(alphaX, alphaY)
