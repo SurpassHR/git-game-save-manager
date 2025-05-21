@@ -66,7 +66,7 @@ class SmartGridScene(GridScene):
 
             # 主网格
             painter.setPen(QPen(self.grid_color, 1))
-            self._drawGrid(painter, rect, effective_size)
+            self._drawGrid(painter, rect, effective_size / 2)
 
     # 通用网格绘制方法
     def _drawGrid(self, painter, rect, size):

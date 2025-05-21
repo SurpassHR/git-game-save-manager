@@ -24,7 +24,7 @@ class CommitObj:
     ):
         self.hexSha = hexSha
         self.author = author
-        self.message = str(message.strip())
+        self.message = str(message.rstrip())
         self.parents = parents
         self.children = children
         self.branches = branches

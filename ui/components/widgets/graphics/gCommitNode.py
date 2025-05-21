@@ -1,9 +1,9 @@
 import sys
 from pathlib import Path
 from PyQt5.QtWidgets import QGraphicsItem, QGraphicsTextItem, QGraphicsItemGroup, QGraphicsEllipseItem
-from PyQt5.QtCore import QRectF, QPointF, Qt, QPoint
+from PyQt5.QtCore import QRectF, QPointF, Qt
 from PyQt5.QtGui import QBrush, QPen, QColor, QFont, QPainter
-from typing import Callable, no_type_check, overload, override, Any, Union
+from typing import Callable, no_type_check, override, Any
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
@@ -71,7 +71,7 @@ class GLabeledCommitNode(QGraphicsItemGroup):
 
         if not event:
             return
-        loggerPrint(f"move '{self.hexSha()}': {self.posBeforeMove.x(), self.posBeforeMove.y()} -> {self.scenePos().x(), self.scenePos().y()}, parent: {self.parents()}")
+        loggerPrint(f"move '{self.hexSha()}': ({self.posBeforeMove.x():.1f}, {self.posBeforeMove.y():.1f}) -> ({self.scenePos().x():.1f}, {self.scenePos().y():.1f}), parent: {self.parents()}")
 
     @override
     def setSelected(self, selected: bool) -> None:
