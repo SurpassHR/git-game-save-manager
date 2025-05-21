@@ -9,14 +9,14 @@ sys.path.append(rootPath)
 
 from core.tools.utils.simpleLogger import loggerPrint
 from ui.components.utils.graphicManager import NodeManager
+from ui.components.utils.uiFunctionBase import UIFunctionBase
 from ui.components.widgets.interfaces import ICommitNode
 
 
-class GridScene(NodeManager, QGraphicsScene):
+class GridScene(NodeManager, QGraphicsScene, UIFunctionBase):
     def __init__(self, parent=None):
         QGraphicsScene.__init__(self, parent)
-        repoPath = "F:\\Games\\25-05-03\\克莱尔的任务Claire's Quest 0.28.1\\www\\save"
-        NodeManager.__init__(self, repoPath)
+        NodeManager.__init__(self, self.uiGetConfig("repo"))
 
         self.grid_size = 20  # 网格基础大小（像素）
         self.grid_color = QColor(220, 220, 220)  # 浅灰色网格
