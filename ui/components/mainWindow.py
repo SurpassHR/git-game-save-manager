@@ -38,13 +38,12 @@ class MainWindow(FluentWindow, UIFunctionBase):
         # 配置导航栏
         self.configNaviBar()
 
-        # 添加页面
-        self.addPages()
-
         # 绑定主窗口
         self.uiSetMainWindow(self)
-
         self.show()
+
+        # 添加页面
+        self.addPages()
 
     def configTheme(self):
         setTheme(Theme.DARK if self.uiGetConfig("them") == "dark" else Theme.LIGHT)

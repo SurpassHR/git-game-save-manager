@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import QGraphicsScene
 from PyQt5.QtCore import QRectF, QPointF, QSizeF, pyqtSlot
 from typing import Optional
 
-rootPath = str(Path(__file__).resolve().parent.parent.parent)
+rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
 from core.tools.publicDef.levelDefs import LogLevels
@@ -174,6 +174,29 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
 
         return maxLevel
 
+    # 判断图中是否有环，按照存档管理的特点，存档之间是不可能合并分支的
+    def isGraphHasCircle(self):
+        visitedNodes: list[str] = []
+        hasCircle: bool = False
+
+        def dfsCheckCircle(node: str):
+            nonlocal hasCircle, visitedNodes
+            if node in visitedNodes:
+                hasCircle = True
+                return
+
+            visitedNodes.append(node)
+            downstreamNodes: list[str] = self.downstream(node)
+            for downNode in downstreamNodes:
+                dfsCheckCircle(downNode)
+
+        rootNode: Optional[GLabeledCommitNode] = self.getRootNode()
+        if rootNode is None:
+            return
+
+        dfsCheckCircle(rootNode.hexSha())
+        return hasCircle
+
     # dict.values: node, posX, posY
     @pyqtSlot(EventEnum, dict)
     def _uiEvt_moveNode(self, _: EventEnum, data: dict):
@@ -329,6 +352,7 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
                 level=LogLevels.DEBUG,
             )
 
+    # dict: GLabeledColliDetectCommitNode
     @pyqtSlot(EventEnum, dict)
     def _uiEvt_mouseMoveNode(self, _: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}):
         nodeToProc = self.selected

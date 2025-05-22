@@ -6,13 +6,12 @@ from pathlib import Path
 from qfluentwidgets import PrimaryPushButton
 from qfluentwidgets.common.icon import FluentIcon
 
-from ui.components.utils.eventManager import EventEnum
-
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
 from core.getGitInfo import CommitObj
-from ui.components.utils.uiFunctionBase import UIFunctionBase
+from ui.components.utils.eventManager import EventEnum
+from ui.components.utils.uiFunctionBase import UIFunctionBase, MsgBoxLevels
 from ui.components.widgets.layouts.infiniteCanvasView import InfiniteCanvasView
 from ui.components.widgets.layouts.gridScene import ColliDetectSmartScene
 from ui.publicDefs.styleDefs import NODE_VERTICAL_SPACING
@@ -81,6 +80,14 @@ class EventGraphPage(QFrame, UIFunctionBase):
         self.addScene(container)
         self.addNodesFromGitInfo()
         self.addConnectionFromGitInfo()
+        hasCircle = self.scene.isGraphHasCircle()
+        if hasCircle:
+            self.uiShowMsgBox(
+                level=MsgBoxLevels.WARNING,
+                msg="当前事件图中出现环，合并分支会导致不可预料的问题",
+                acptCbk=None,
+                rjctCbk=None,
+            )
         self.setLayout(container)
 
     def addStandardNode(self) -> None:
