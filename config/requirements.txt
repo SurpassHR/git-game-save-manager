@@ -1,8 +1,0 @@
-requests
-PyQt5
-PyQt-Fluent-Widgets[full]
-pytz
-openpyxl
-pyinstaller
-rich
-gitpython

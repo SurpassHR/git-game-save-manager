@@ -1,5 +1,7 @@
-from ui.app import start
+from src.app import App
 
 
 if __name__ == "__main__":
-    start()
+    windowTitle: str = "Git Game Save Manager Dev."
+    app = App(title=windowTitle)
+    app.start()
