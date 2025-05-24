@@ -10,7 +10,7 @@ sys.path.append(rootPath)
 
 from core.tools.publicDef.levelDefs import LogLevels
 from core.tools.utils.dataStructTools import listDedup
-from core.getGitInfo import CommitObj, GitRepoInfoMgr
+from core.gitManager import CommitObj, GitRepoInfoMgr
 from core.tools.utils.simpleLogger import loggerPrint
 
 from ui.components.widgets.graphics.gCommitNode import GLabeledCommitNode, GLabeledColliDetectCommitNode
@@ -150,6 +150,12 @@ class NodeManager(GitRepoInfoMgr, UIFunctionBase):
         for node in self.nodes.values():
             self.scene.removeItem(node)
         self.nodes.clear()
+
+        for edge in self.edges.values():
+            self.scene.removeItem(edge)
+        self.edges.clear()
+
+        self.selected = None
 
     def clearAllSelectedGraphic(self) -> None:
         for node in self.nodes.values():

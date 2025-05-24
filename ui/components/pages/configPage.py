@@ -4,6 +4,8 @@ from pathlib import Path
 
 from qfluentwidgets import FluentIcon
 
+from ui.components.utils.eventManager import EventEnum
+
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
@@ -48,6 +50,7 @@ class ConfigPage(QFrame, UIFunctionBase):
             setConfig("repo", path)
             selectedRepo = "当前管理存档目录: " + f"{getConfig("repo")}"
             widget.setDescription(f"{selectedRepo}")
+            self.uiEmit(EventEnum.UI_GIT_MANAGER_REFRESH_COMMIT_INFO, {})
 
         return PushButtonCard(
             title="选择存档目录",

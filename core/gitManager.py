@@ -24,7 +24,7 @@ class CommitObj:
     ):
         self.hexSha = hexSha
         self.author = author
-        self.message = str(message.replace("\n", ""))
+        self.message = str(message.rstrip())
         self.parents = parents
         self.children = children
         self.branches = branches
@@ -46,6 +46,9 @@ class GitRepoInfoMgr(DAG):
     def __init__(self, repoPath: str):
         super().__init__()
 
+        self.initRepo(repoPath)
+
+    def initRepo(self, repoPath: str):
         if not self.checkRepoPathValid(repoPath):
             exit(-1)
         self.gitRepo = Repo.init(repoPath)
@@ -110,7 +113,9 @@ class GitRepoInfoMgr(DAG):
 
         return commitInfo
 
-    def getRepoRawCommitInfo(self) -> dict[str, CommitObj]:
+    def getRepoRawCommitInfo(self, repoPath: str = "") -> dict[str, CommitObj]:
+        if repoPath != "":
+            self.initRepo(repoPath)
         self.reset_graph()
         commitInfoDict = self.getBasicRepoCommitInfo()
         branchNameList = self.getRepoBranchInfo()

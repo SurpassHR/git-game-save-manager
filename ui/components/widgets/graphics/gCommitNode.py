@@ -9,7 +9,7 @@ rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
 from core.tools.utils.simpleLogger import loggerPrint
-from core.getGitInfo import CommitObj
+from core.gitManager import CommitObj
 from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
 
 

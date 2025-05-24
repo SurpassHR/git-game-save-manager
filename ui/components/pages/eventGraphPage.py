@@ -1,6 +1,7 @@
 import sys
 import uuid
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QFrame, QBoxLayout
+from PyQt5.QtCore import pyqtSlot
 from pathlib import Path
 
 from qfluentwidgets import PrimaryPushButton
@@ -9,7 +10,7 @@ from qfluentwidgets.common.icon import FluentIcon
 rootPath = str(Path(__file__).resolve().parent.parent.parent.parent)
 sys.path.append(rootPath)
 
-from core.getGitInfo import CommitObj
+from core.gitManager import CommitObj
 from ui.components.utils.eventManager import EventEnum
 from ui.components.utils.uiFunctionBase import UIFunctionBase, MsgBoxLevels
 from ui.components.widgets.layouts.infiniteCanvasView import InfiniteCanvasView
@@ -25,20 +26,24 @@ class EventGraphPage(QFrame, UIFunctionBase):
 
         self.window = window
 
+        self.subscribeEvt()
+
         self.createUI()
 
     def addScene(self, container: QBoxLayout) -> None:
         self.scene = ColliDetectSmartScene(self)
 
         view = InfiniteCanvasView(self.scene, self)
-        # view.setGeometry(0, 0, 1280, 720)
 
         container.addWidget(view)
 
-    def addNodesFromGitInfo(self) -> None:
-        commitDict: dict[str, CommitObj] = self.scene.getRepoRawCommitInfo()
+    @pyqtSlot(EventEnum, dict)
+    def _uiEvt_nodeMgrRefreshCommits(self, event: EventEnum = EventEnum.EVENT_INVALID, data: dict = {}) -> None:
+        commitDict: dict[str, CommitObj] = self.scene.getRepoRawCommitInfo(self.uiGetConfig("repo") if event != EventEnum.EVENT_INVALID else "")
+        self.scene.destroyAll()
         for k in reversed(self.scene.graph.keys()):
             self.addNodeFromRelations(commitDict[k])
+        self.addConnectionFromGitInfo()
         self.scene._logicEvt_arrangeNodeGraphics()
 
     def addConnectionFromGitInfo(self) -> None:
@@ -78,8 +83,7 @@ class EventGraphPage(QFrame, UIFunctionBase):
 
         addCtrlBtn(container)
         self.addScene(container)
-        self.addNodesFromGitInfo()
-        self.addConnectionFromGitInfo()
+        self._uiEvt_nodeMgrRefreshCommits()
         hasCircle = self.scene.isGraphHasCircle()
         if hasCircle:
             self.uiShowMsgBox(
@@ -156,3 +160,6 @@ class EventGraphPage(QFrame, UIFunctionBase):
         if not selectedNode:
             return
         self.scene.removeGraphic(selectedNode.hexSha())
+
+    def subscribeEvt(self):
+        self.uiSubscribe(EventEnum.UI_GIT_MANAGER_REFRESH_COMMIT_INFO, self._uiEvt_nodeMgrRefreshCommits)
