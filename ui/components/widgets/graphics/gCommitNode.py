@@ -37,7 +37,6 @@ class GLabeledCommitNode(QGraphicsItemGroup):
         # 创建文本项
         self.font = QFont("微软雅黑")
         self.textItem = QGraphicsTextItem()
-        self.textItem.setPos(rect.x(), rect.y())  # 调整文本位置
         self.textItem.setFont(self.font)
         self.textItem.setDefaultTextColor(QColor("#000"))
         self.textItem.show()
@@ -77,7 +76,6 @@ class GLabeledCommitNode(QGraphicsItemGroup):
     @override
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
-        self.updateTextPosition()
 
     @override
     def boundingRect(self):
@@ -152,9 +150,6 @@ class GLabeledCommitNode(QGraphicsItemGroup):
         y = self.rectItem.scenePos().y() + self.rectItem.boundingRect().height() / 2
         return QPointF(x, y)
 
-    def getNodeGraphicRect(self) -> QRectF:
-        return self.rectItem.sceneBoundingRect()
-
 
 class GLabeledColliDetectCommitNode(GLabeledCommitNode, UIFunctionBase):
     def __init__(self, rect: QRectF, selectCb: Callable[..., Any], level: int):
@@ -181,8 +176,9 @@ class GLabeledColliDetectCommitNode(GLabeledCommitNode, UIFunctionBase):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
             # 只处理由拖动引起的位置变化
+            self.originalPos = self.scenePos()
             if self.isDragging:
-                self.originalPos = self.pos()
+                # self.originalPos = self.scenePos()
                 newPos = value
                 # 如果拖动的是当前项，立即通知场景处理碰撞
                 data = {

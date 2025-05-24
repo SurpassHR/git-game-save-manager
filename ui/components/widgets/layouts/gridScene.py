@@ -1,13 +1,14 @@
 import sys
 from PyQt5.QtWidgets import QGraphicsScene, QGraphicsItem
 from PyQt5.QtGui import QPen, QColor
-from PyQt5.QtCore import Qt, QLineF, QPointF, pyqtSlot
+from PyQt5.QtCore import Qt, QLineF, QPointF, pyqtSlot, QRectF
 from pathlib import Path
 from typing import Optional
 
 rootPath = str(Path(__file__).resolve().parent.parent.parent)
 sys.path.append(rootPath)
 
+from core.tools.utils.simpleLogger import loggerPrint
 from ui.components.utils.graphicManager import NodeManager
 from ui.components.utils.uiFunctionBase import UIFunctionBase, EventEnum
 from ui.components.widgets.graphics.gCommitNode import GLabeledColliDetectCommitNode
@@ -125,8 +126,8 @@ class ColliDetectSmartScene(SmartGridScene):
             self.isProcessingCollision = False
 
     def distanceSquare(self, node: GLabeledColliDetectCommitNode, draggedNode: GLabeledColliDetectCommitNode):
-        node1Center = node.getNodeGraphicRect().center()
-        node2Center = draggedNode.getNodeGraphicRect().center()
+        node1Center = node.sceneBoundingRect().center()
+        node2Center = draggedNode.sceneBoundingRect().center()
 
         return int(node1Center.x() - node2Center.x()) ** 2 + int(node1Center.y() - node2Center.y()) ** 2
 
@@ -200,9 +201,12 @@ class ColliDetectSmartScene(SmartGridScene):
             return node1, node2
 
         # 两者都未被选中，与 draggedItem 接触的不移动，未接触的移动
-        if node1.getNodeGraphicRect().intersects(draggedNode.getNodeGraphicRect()):
+        node1Rect = QRectF(node1.originalPos.x(), node1.originalPos.y(), node1.sceneBoundingRect().width(), node1.sceneBoundingRect().height())
+        node2Rect = QRectF(node2.originalPos.x(), node2.originalPos.y(), node2.sceneBoundingRect().width(), node2.sceneBoundingRect().height())
+        draggedNodeRect = QRectF(draggedNode.scenePos().x(), draggedNode.scenePos().y(), draggedNode.sceneBoundingRect().width(), draggedNode.sceneBoundingRect().height())
+        if node1Rect.intersects(draggedNodeRect):
             return node2, node1
-        elif node2.getNodeGraphicRect().intersects(draggedNode.getNodeGraphicRect()):
+        elif node2Rect.intersects(draggedNodeRect):
             return node1, node2
 
         # 两者都被选中或都未被选中，选择距离被选中者较远的移动
@@ -215,8 +219,8 @@ class ColliDetectSmartScene(SmartGridScene):
 
     # 计算推动向量
     def calculatePushVector(self, nodeToMove: GLabeledColliDetectCommitNode, nodeToFixed: GLabeledColliDetectCommitNode):
-        nodeToMoveRect = nodeToMove.getNodeGraphicRect()
-        nodeToFixedRect = nodeToFixed.getNodeGraphicRect()
+        nodeToMoveRect = nodeToMove.sceneBoundingRect()
+        nodeToFixedRect = nodeToFixed.sceneBoundingRect()
 
         # 确保矩形实际重叠
         if not nodeToMoveRect.intersects(nodeToFixedRect):
