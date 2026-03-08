@@ -9,6 +9,7 @@ export interface CommitInfo {
     parents: string[];
     branches: string[];
     timestamp: number;
+    is_current: boolean;
 }
 
 /** Matches `BranchInfo` in src-tauri/src/models/commit.rs */

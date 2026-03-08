@@ -9,6 +9,7 @@ pub struct CommitInfo {
     pub parents: Vec<String>,
     pub branches: Vec<String>,
     pub timestamp: i64,
+    pub is_current: bool,
 }
 
 /// Represents a branch with its head commit

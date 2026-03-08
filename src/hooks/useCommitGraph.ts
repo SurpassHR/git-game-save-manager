@@ -89,6 +89,7 @@ export function useCommitGraph(
                     timestamp: commit.timestamp,
                     branches: commit.branches,
                     isSelected: selectedCommit === commit.hex_sha,
+                    isCurrent: commit.is_current,
                 } satisfies CommitNodeData,
                 style: { width: NODE_WIDTH, height: NODE_HEIGHT },
             };

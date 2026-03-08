@@ -472,6 +472,23 @@ body {
   box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.2), var(--shadow-md);
 }
 
+.commit-node--current {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success), var(--shadow-sm);
+}
+
+.commit-node__current-badge {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(81, 207, 102, 0.15);
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .commit-node__header {
   display: flex;
   align-items: center;

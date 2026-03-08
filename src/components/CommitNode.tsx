@@ -11,6 +11,7 @@ export interface CommitNodeData {
     timestamp: number;
     branches: string[];
     isSelected: boolean;
+    isCurrent: boolean;
     [key: string]: unknown;
 }
 
@@ -26,18 +27,23 @@ function formatTime(ts: number) {
 function CommitNodeComponent({ data }: NodeProps) {
     const d = data as CommitNodeData;
     return (
-        <div className={`commit-node ${d.isSelected ? "commit-node--selected" : ""}`}>
+        <div className={`commit-node ${d.isSelected ? "commit-node--selected" : ""} ${d.isCurrent ? "commit-node--current" : ""}`}>
             <Handle type="target" position={Position.Top} className="commit-handle" />
 
             <div className="commit-node__header">
                 <span className="commit-node__sha">{d.hexSha}</span>
-                {d.branches.length > 0 && (
-                    <div className="commit-node__branches">
-                        {d.branches.map((b: string) => (
-                            <span key={b} className="commit-node__branch">{b}</span>
-                        ))}
-                    </div>
-                )}
+                <div style={{ display: "flex", gap: "4px" }}>
+                    {d.isCurrent && (
+                        <span className="commit-node__current-badge">📍 当前存档</span>
+                    )}
+                    {(d.branches as string[])?.length > 0 && (
+                        <div className="commit-node__branches">
+                            {(d.branches as string[]).map((b: string) => (
+                                <span key={b} className="commit-node__branch">{b}</span>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="commit-node__message">{d.message || "(no message)"}</div>

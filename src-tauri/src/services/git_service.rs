@@ -20,6 +20,12 @@ pub fn init_repo(repo_path: &str) -> Result<(), Box<dyn std::error::Error>> {
 pub fn list_commits(repo_path: &str) -> Result<Vec<CommitInfo>, Box<dyn std::error::Error>> {
     let repo = Repository::open(repo_path)?;
 
+    // Get current HEAD commit SHA
+    let head_sha = repo.head()
+        .ok()
+        .and_then(|h| h.peel_to_commit().ok())
+        .map(|c| c.id().to_string()[..8].to_string());
+
     // Build a map of commit SHA -> branch names
     let mut branch_map: HashMap<String, Vec<String>> = HashMap::new();
     if let Ok(branches) = repo.branches(Some(git2::BranchType::Local)) {
@@ -44,6 +50,8 @@ pub fn list_commits(repo_path: &str) -> Result<Vec<CommitInfo>, Box<dyn std::err
         let commit = repo.find_commit(oid)?;
         let hex_sha = oid.to_string()[..8].to_string();
 
+        let is_current = Some(&hex_sha) == head_sha.as_ref();
+
         let info = CommitInfo {
             branches: branch_map.get(&hex_sha).cloned().unwrap_or_default(),
             hex_sha,
@@ -54,6 +62,7 @@ pub fn list_commits(repo_path: &str) -> Result<Vec<CommitInfo>, Box<dyn std::err
                 .map(|id| id.to_string()[..8].to_string())
                 .collect(),
             timestamp: commit.time().seconds(),
+            is_current,
         };
         commits.push(info);
     }
