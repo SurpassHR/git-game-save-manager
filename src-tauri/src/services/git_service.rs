@@ -44,13 +44,20 @@ pub fn list_commits(repo_path: &str) -> Result<Vec<CommitInfo>, Box<dyn std::err
     }
 
     let mut revwalk = repo.revwalk()?;
+    // Push BOTH HEAD and all named refs to ensure we include commits
+    // reachable from detached HEAD (push_glob only walks refs/*)
+    revwalk.push_head()?;
     revwalk.push_glob("*")?;
     revwalk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
 
     let mut commits: Vec<CommitInfo> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
 
     for oid in revwalk {
         let oid = oid?;
+        if !seen.insert(oid) {
+            continue; // Skip duplicates
+        }
         let commit = repo.find_commit(oid)?;
         let hex_sha = oid.to_string()[..8].to_string();
 
