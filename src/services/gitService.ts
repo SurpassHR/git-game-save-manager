@@ -56,11 +56,12 @@ export async function resetHard(
 }
 
 /**
- * Amend the message of the current HEAD commit
+ * Amend the message of a specific historical or current commit
  */
 export async function amendCommit(
     repoPath: string,
+    commitSha: string,
     newMessage: string
 ): Promise<string> {
-    return invoke<string>("amend_commit", { repoPath, newMessage });
+    return invoke<string>("amend_commit", { repoPath, commitSha, newMessage });
 }

@@ -7,7 +7,6 @@ export interface ContextMenuProps {
     x: number;
     y: number;
     commitSha: string;
-    isCurrent: boolean;
     onClose: () => void;
     onResetHard: (sha: string) => void;
     onAmendMessage: (sha: string) => void;
@@ -17,7 +16,6 @@ export function ContextMenu({
     x,
     y,
     commitSha,
-    isCurrent,
     onClose,
     onResetHard,
     onAmendMessage,
@@ -72,17 +70,13 @@ export function ContextMenu({
 
             <button
                 className="context-menu__item"
-                disabled={!isCurrent}
                 onClick={() => {
-                    if (isCurrent) {
-                        onAmendMessage(commitSha);
-                        onClose();
-                    }
+                    onAmendMessage(commitSha);
+                    onClose();
                 }}
-                title={!isCurrent ? "只能修改当前所处存档的说明" : ""}
             >
                 <span className="context-menu__icon">✏️</span>
-                <span>修改当前说明</span>
+                <span>修改说明</span>
             </button>
         </div>
     );

@@ -47,8 +47,14 @@ export function CommitGraphPage() {
         x: number;
         y: number;
         commitSha: string;
-        isCurrent: boolean;
     } | null>(null);
+
+    // Prompt Modal State for amending messages
+    const [promptModal, setPromptModal] = useState<{
+        isOpen: boolean;
+        sha: string;
+        currentMessage: string;
+    }>({ isOpen: false, sha: "", currentMessage: "" });
 
     // Find selected commit data
     const selectedCommitData = commits.find(
@@ -110,12 +116,11 @@ export function CommitGraphPage() {
     const onNodeContextMenu = useCallback(
         (event: React.MouseEvent, node: Node) => {
             event.preventDefault();
-            const d = node.data as { hexSha: string; isCurrent: boolean };
+            const d = node.data as { hexSha: string };
             setContextMenu({
                 x: event.clientX,
                 y: event.clientY,
                 commitSha: d.hexSha,
-                isCurrent: d.isCurrent,
             });
         },
         []
@@ -137,16 +142,19 @@ export function CommitGraphPage() {
         }
     };
 
-    const handleAmendMessage = async (sha: string) => {
+    const handleAmendMessage = (sha: string) => {
         if (!activeProfile) return;
         const currentMessage = commits.find((c) => c.hex_sha === sha)?.message || "";
+        setPromptModal({ isOpen: true, sha, currentMessage });
+    };
 
-        // Use native window.prompt as @tauri-apps/plugin-dialog v2 does not have `prompt`
-        const newMessage = window.prompt("修改当前存档说明:", currentMessage);
+    const handlePromptConfirm = async (newMessage: string) => {
+        const { sha, currentMessage } = promptModal;
+        setPromptModal((p) => ({ ...p, isOpen: false }));
 
-        if (newMessage && newMessage !== currentMessage) {
+        if (newMessage && newMessage !== currentMessage && activeProfile) {
             try {
-                await amendCommit(activeProfile.repo_path, newMessage);
+                await amendCommit(activeProfile.repo_path, sha, newMessage);
                 await loadCommits();
             } catch (err) {
                 console.error("Failed to amend commit:", err);
@@ -237,12 +245,20 @@ export function CommitGraphPage() {
                     x={contextMenu.x}
                     y={contextMenu.y}
                     commitSha={contextMenu.commitSha}
-                    isCurrent={contextMenu.isCurrent}
                     onClose={() => setContextMenu(null)}
                     onResetHard={handleResetHard}
                     onAmendMessage={handleAmendMessage}
                 />
             )}
+
+            {/* Prompt Modal Overlay */}
+            <PromptModal
+                isOpen={promptModal.isOpen}
+                title="修改存档说明"
+                defaultValue={promptModal.currentMessage}
+                onConfirm={handlePromptConfirm}
+                onCancel={() => setPromptModal((p) => ({ ...p, isOpen: false }))}
+            />
 
             {/* React Flow DAG + Detail Panel */}
             {!loading && commits.length > 0 && (
@@ -294,6 +310,60 @@ export function CommitGraphPage() {
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+// React modal component for requesting user text input safely in Tauri
+function PromptModal({
+    isOpen,
+    title,
+    defaultValue,
+    onConfirm,
+    onCancel,
+}: {
+    isOpen: boolean;
+    title: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+    onCancel: () => void;
+}) {
+    const [val, setVal] = useState(defaultValue);
+
+    useEffect(() => {
+        setVal(defaultValue);
+    }, [defaultValue, isOpen]);
+
+    // Handle escape globally when open
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKd = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+        document.addEventListener("keydown", handleKd);
+        return () => document.removeEventListener("keydown", handleKd);
+    }, [isOpen, onCancel]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onCancel}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <h3>{title}</h3>
+                <input
+                    className="input"
+                    value={val}
+                    onChange={(e) => setVal(e.target.value)}
+                    autoFocus
+                    style={{ width: "100%", marginBottom: "16px" }}
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter") onConfirm(val);
+                        // Escape gives way to the global event listener above
+                    }}
+                />
+                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                    <button className="btn" onClick={onCancel}>取消</button>
+                    <button className="btn btn-primary" onClick={() => onConfirm(val)}>确认</button>
+                </div>
+            </div>
         </div>
     );
 }

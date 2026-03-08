@@ -166,27 +166,110 @@ pub fn reset_hard_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dy
     Ok(())
 }
 
-/// Amend the message of the current HEAD commit
-pub fn amend_commit(repo_path: &str, new_message: &str) -> Result<String, Box<dyn std::error::Error>> {
+/// Amend the message of a specific historical or current commit
+/// This performs a programmatic rebase if the commit is not HEAD.
+pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Result<String, Box<dyn std::error::Error>> {
     let repo = Repository::open(repo_path)?;
+    let target_oid = repo.revparse_single(target_sha)?.id();
 
-    // Get current HEAD
-    let mut head_ref = repo.head()?;
+    // 1. Get current HEAD
+    let head_ref = repo.head()?;
+    let is_branch = head_ref.is_branch();
+    let branch_name = if is_branch {
+        head_ref.name().map(String::from)
+    } else {
+        None
+    };
     let head_commit = head_ref.peel_to_commit()?;
-    let tree = head_commit.tree()?;
+    let head_oid = head_commit.id();
 
-    // Git signature
+    // Fast path: amending the current HEAD is trivial and quick
+    if head_oid == target_oid {
+        let sig = Signature::now("Git Game Save Manager", "save@manager.local")?;
+        let new_oid = head_commit.amend(
+            Some("HEAD"),
+            Some(&sig),
+            Some(&sig),
+            None,
+            Some(new_message),
+            None // Use same tree
+        )?;
+        return Ok(new_oid.to_string()[..8].to_string());
+    }
+
+    // 2. Complex path: Target is in history. We must rebase.
+    // First, verify the target is actually an ancestor of HEAD to safely linear-rebase
+    let is_ancestor = repo.graph_descendant_of(head_oid, target_oid)?;
+    if !is_ancestor {
+        return Err("Cannot amend a commit that is not an ancestor of current HEAD. Branch switching required.".into());
+    }
+
+    // 3. Collect the path from HEAD down to the CHILD of target_commit
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push(head_oid)?;
+    revwalk.hide(target_oid)?;
+    revwalk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::REVERSE)?;
+
+    let mut commits_to_replay = Vec::new();
+    for oid in revwalk {
+        commits_to_replay.push(oid?);
+    }
+
+    // 4. Checkout the target commit in detached state
+    repo.set_head_detached(target_oid)?;
+    let target_commit = repo.find_commit(target_oid)?;
+    repo.checkout_tree(target_commit.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+
+    // 5. Amend the target commit
     let sig = Signature::now("Git Game Save Manager", "save@manager.local")?;
-
-    // Execute amend
-    let new_oid = head_commit.amend(
+    let amended_target_oid = target_commit.amend(
         Some("HEAD"),
         Some(&sig),
         Some(&sig),
         None,
         Some(new_message),
-        Some(&tree)
+        None, // Use same tree
     )?;
+    
+    // Safety check tracking our new ascending HEAD
+    let mut current_parent_oid = amended_target_oid;
 
-    Ok(new_oid.to_string()[..8].to_string())
+    // 6. Replay (Cherry-pick) collected commits on top of the new ascending HEAD
+    for oid in commits_to_replay {
+        let commit_to_replay = repo.find_commit(oid)?;
+        
+        let parent_commit = repo.find_commit(current_parent_oid)?;
+        let mut index = repo.cherrypick_commit(&commit_to_replay, &parent_commit, 0, None)?;
+        
+        // Write the new tree from the cherry-pick index
+        let tree_oid = index.write_tree_to(&repo)?;
+        let tree = repo.find_tree(tree_oid)?;
+        
+        // Re-create the commit
+        let author_sig = commit_to_replay.author();
+        let committer_sig = commit_to_replay.committer();
+        let message = commit_to_replay.message().unwrap_or("");
+        
+        current_parent_oid = repo.commit(
+            Some("HEAD"),
+            &author_sig,
+            &committer_sig,
+            message,
+            &tree,
+            &[&parent_commit]
+        )?;
+
+        // Update working directory progressively
+        let current_commit_obj = repo.find_commit(current_parent_oid)?;
+        repo.checkout_tree(current_commit_obj.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+    }
+
+    // 7. Restore the original reference (if it was a branch) to point to the newly replayed HEAD
+    if let Some(ref_name) = branch_name {
+        repo.reference(&ref_name, current_parent_oid, true, "Programmatic rebase completed")?;
+        repo.set_head(&ref_name)?;
+    }
+    // detached head is already pointing correctly because of Some("HEAD") during repo.commit
+
+    Ok(amended_target_oid.to_string()[..8].to_string())
 }
