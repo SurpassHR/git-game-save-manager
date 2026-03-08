@@ -8,7 +8,7 @@ export interface ContextMenuProps {
     y: number;
     commitSha: string;
     onClose: () => void;
-    onResetHard: (sha: string) => void;
+    onCheckout: (sha: string) => void;
     onDeleteCommit: (sha: string) => void;
     onAmendMessage: (sha: string) => void;
     onCreateBranch: (sha: string) => void;
@@ -19,7 +19,7 @@ export function ContextMenu({
     y,
     commitSha,
     onClose,
-    onResetHard,
+    onCheckout,
     onDeleteCommit,
     onAmendMessage,
     onCreateBranch,
@@ -79,11 +79,11 @@ export function ContextMenu({
             <div className="context-menu__separator" />
 
             <button
-                className="context-menu__item context-menu__item--danger"
-                onClick={() => { onResetHard(commitSha); onClose(); }}
+                className="context-menu__item"
+                onClick={() => { onCheckout(commitSha); onClose(); }}
             >
-                <span className="context-menu__icon">⚠️</span>
-                <span>恢复并删除后续存档</span>
+                <span className="context-menu__icon">📂</span>
+                <span>切换到此存档</span>
             </button>
         </div>
     );

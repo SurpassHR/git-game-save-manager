@@ -19,7 +19,7 @@ import { useAppStore } from "../store";
 import { useCommitGraph } from "../hooks/useCommitGraph";
 import { CommitNode } from "../components/CommitNode";
 import { CommitDetailPanel } from "../components/CommitDetailPanel";
-import { resetHard, amendCommit, deleteCommit, createBranch, switchBranch } from "../services/gitService";
+import { amendCommit, deleteCommit, createBranch, switchBranch } from "../services/gitService";
 import * as gitService from "../services/gitService";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { ContextMenu } from "../components/ContextMenu";
@@ -127,21 +127,6 @@ export function CommitGraphPage() {
         []
     );
 
-    const handleResetHard = async (sha: string) => {
-        if (!activeProfile) return;
-        const confirmed = await ask(
-            `警告：这将恢复到存档 ${sha}，并且丢弃此后产生的所有未来存档和未提交数据。确定要继续吗？`,
-            { title: "恢复存档并切除未来", kind: "warning" }
-        );
-        if (confirmed) {
-            try {
-                await resetHard(activeProfile.repo_path, sha);
-                await loadCommits();
-            } catch (err) {
-                console.error("Failed to reset hard:", err);
-            }
-        }
-    };
 
     const handleDeleteCommit = async (sha: string) => {
         if (!activeProfile) return;
@@ -297,7 +282,7 @@ export function CommitGraphPage() {
                     y={contextMenu.y}
                     commitSha={contextMenu.commitSha}
                     onClose={() => setContextMenu(null)}
-                    onResetHard={handleResetHard}
+                    onCheckout={handleCheckout}
                     onDeleteCommit={handleDeleteCommit}
                     onAmendMessage={handleAmendMessage}
                     onCreateBranch={handleCreateBranch}
