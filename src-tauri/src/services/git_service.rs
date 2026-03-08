@@ -211,7 +211,8 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
     // First, verify the target is actually an ancestor of HEAD to safely linear-rebase
     let is_ancestor = repo.graph_descendant_of(head_oid, target_oid)?;
     if !is_ancestor {
-        return Err("Cannot amend a commit that is not an ancestor of current HEAD. Branch switching required.".into());
+        println!("[GitService] Rejecting amend: Commit {} is not an ancestor of current HEAD ({}).", target_oid, head_oid);
+        return Err("当前存档不是最新存档的直系祖先，无法进行安全重写。要想修改该存档，请先将其切换为当前存档。".into());
     }
 
     // 3. Collect the path from HEAD down to the CHILD of target_commit

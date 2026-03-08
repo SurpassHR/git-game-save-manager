@@ -21,7 +21,7 @@ import { CommitNode } from "../components/CommitNode";
 import { CommitDetailPanel } from "../components/CommitDetailPanel";
 import { resetHard, amendCommit } from "../services/gitService";
 import * as gitService from "../services/gitService";
-import { ask } from "@tauri-apps/plugin-dialog";
+import { ask, message } from "@tauri-apps/plugin-dialog";
 import { ContextMenu } from "../components/ContextMenu";
 
 const nodeTypes = { commitNode: CommitNode };
@@ -158,6 +158,7 @@ export function CommitGraphPage() {
                 await loadCommits();
             } catch (err) {
                 console.error("Failed to amend commit:", err);
+                await message(String(err), { title: "修改说明失败", kind: "error" });
             }
         }
     };
