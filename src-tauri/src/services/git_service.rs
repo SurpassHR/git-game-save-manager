@@ -98,6 +98,39 @@ pub fn get_branches(repo_path: &str) -> Result<Vec<String>, Box<dyn std::error::
     Ok(branch_names)
 }
 
+/// Create a new branch at a specific commit and switch to it
+pub fn create_branch(repo_path: &str, branch_name: &str, commit_sha: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[GitService] Creating branch '{}' at commit {} in {}", branch_name, commit_sha, repo_path);
+    let repo = Repository::open(repo_path)?;
+    let oid = repo.revparse_single(commit_sha)?.id();
+    let commit = repo.find_commit(oid)?;
+
+    // Create the branch
+    repo.branch(branch_name, &commit, false)?;
+
+    // Switch to the new branch
+    let refname = format!("refs/heads/{}", branch_name);
+    repo.set_head(&refname)?;
+    repo.checkout_tree(commit.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+
+    println!("[GitService] Branch '{}' created and checked out.", branch_name);
+    Ok(())
+}
+
+/// Switch to an existing branch
+pub fn switch_branch(repo_path: &str, branch_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[GitService] Switching to branch '{}' in {}", branch_name, repo_path);
+    let repo = Repository::open(repo_path)?;
+
+    let refname = format!("refs/heads/{}", branch_name);
+    let obj = repo.revparse_single(&refname)?;
+    repo.checkout_tree(&obj, Some(git2::build::CheckoutBuilder::new().force()))?;
+    repo.set_head(&refname)?;
+
+    println!("[GitService] Switched to branch '{}'.", branch_name);
+    Ok(())
+}
+
 /// Create a new commit
 pub fn create_commit(repo_path: &str, message: &str) -> Result<String, Box<dyn std::error::Error>> {
     println!("[GitService] Creating new commit: '{}' at {}", message, repo_path);

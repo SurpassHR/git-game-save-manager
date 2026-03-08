@@ -75,3 +75,24 @@ export async function deleteCommit(
 ): Promise<void> {
     return invoke<void>("delete_commit", { repoPath, commitSha });
 }
+
+/**
+ * Create a new branch at a specific commit and switch to it
+ */
+export async function createBranch(
+    repoPath: string,
+    branchName: string,
+    commitSha: string
+): Promise<void> {
+    return invoke<void>("create_branch", { repoPath, branchName, commitSha });
+}
+
+/**
+ * Switch to an existing branch
+ */
+export async function switchBranch(
+    repoPath: string,
+    branchName: string
+): Promise<void> {
+    return invoke<void>("switch_branch", { repoPath, branchName });
+}

@@ -11,6 +11,7 @@ export interface ContextMenuProps {
     onResetHard: (sha: string) => void;
     onDeleteCommit: (sha: string) => void;
     onAmendMessage: (sha: string) => void;
+    onCreateBranch: (sha: string) => void;
 }
 
 export function ContextMenu({
@@ -21,6 +22,7 @@ export function ContextMenu({
     onResetHard,
     onDeleteCommit,
     onAmendMessage,
+    onCreateBranch,
 }: ContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -45,21 +47,25 @@ export function ContextMenu({
     }, [onClose]);
 
     return (
-        <div
-            ref={menuRef}
-            className="context-menu"
-            style={{ top: y, left: x }}
-        >
+        <div ref={menuRef} className="context-menu" style={{ top: y, left: x }}>
             <div className="context-menu__header">
                 存档: <span className="context-menu__sha">{commitSha}</span>
             </div>
 
             <button
                 className="context-menu__item"
-                onClick={() => { onResetHard(commitSha); onClose(); }}
+                onClick={() => { onCreateBranch(commitSha); onClose(); }}
             >
-                <span className="context-menu__icon">⚠️</span>
-                <span>恢复并删除后续存档</span>
+                <span className="context-menu__icon">🌿</span>
+                <span>从此处创建分支</span>
+            </button>
+
+            <button
+                className="context-menu__item"
+                onClick={() => { onAmendMessage(commitSha); onClose(); }}
+            >
+                <span className="context-menu__icon">✏️</span>
+                <span>修改说明</span>
             </button>
 
             <button
@@ -70,12 +76,14 @@ export function ContextMenu({
                 <span>删除此存档</span>
             </button>
 
+            <div className="context-menu__separator" />
+
             <button
-                className="context-menu__item"
-                onClick={() => { onAmendMessage(commitSha); onClose(); }}
+                className="context-menu__item context-menu__item--danger"
+                onClick={() => { onResetHard(commitSha); onClose(); }}
             >
-                <span className="context-menu__icon">✏️</span>
-                <span>修改说明</span>
+                <span className="context-menu__icon">⚠️</span>
+                <span>恢复并删除后续存档</span>
             </button>
         </div>
     );

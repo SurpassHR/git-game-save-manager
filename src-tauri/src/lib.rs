@@ -22,6 +22,8 @@ pub fn run() {
             reset_hard_commit,
             amend_commit,
             delete_commit,
+            create_branch,
+            switch_branch,
             // Config commands
             get_config,
             set_config,

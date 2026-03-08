@@ -19,7 +19,7 @@ import { useAppStore } from "../store";
 import { useCommitGraph } from "../hooks/useCommitGraph";
 import { CommitNode } from "../components/CommitNode";
 import { CommitDetailPanel } from "../components/CommitDetailPanel";
-import { resetHard, amendCommit, deleteCommit } from "../services/gitService";
+import { resetHard, amendCommit, deleteCommit, createBranch, switchBranch } from "../services/gitService";
 import * as gitService from "../services/gitService";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { ContextMenu } from "../components/ContextMenu";
@@ -54,7 +54,8 @@ export function CommitGraphPage() {
         isOpen: boolean;
         sha: string;
         currentMessage: string;
-    }>({ isOpen: false, sha: "", currentMessage: "" });
+        mode: "amend" | "branch";
+    }>({ isOpen: false, sha: "", currentMessage: "", mode: "amend" });
 
     // Find selected commit data
     const selectedCommitData = commits.find(
@@ -162,32 +163,48 @@ export function CommitGraphPage() {
     const handleAmendMessage = (sha: string) => {
         if (!activeProfile) return;
         const currentMessage = commits.find((c) => c.hex_sha === sha)?.message || "";
-        setPromptModal({ isOpen: true, sha, currentMessage });
+        setPromptModal({ isOpen: true, sha, currentMessage, mode: "amend" });
     };
 
-    const handlePromptConfirm = async (newMessage: string) => {
-        const { sha, currentMessage } = promptModal;
+    const handlePromptConfirm = async (value: string) => {
+        const { sha, currentMessage, mode } = promptModal;
         setPromptModal((p) => ({ ...p, isOpen: false }));
 
-        console.log("[Amend Debug] sha:", sha);
-        console.log("[Amend Debug] newMessage:", JSON.stringify(newMessage));
-        console.log("[Amend Debug] currentMessage:", JSON.stringify(currentMessage));
-        console.log("[Amend Debug] activeProfile:", !!activeProfile);
-        console.log("[Amend Debug] condition:", newMessage && newMessage !== currentMessage && !!activeProfile);
+        if (!value.trim() || !activeProfile) return;
 
-        if (newMessage && newMessage !== currentMessage && activeProfile) {
+        if (mode === "amend") {
+            if (value === currentMessage) return;
             try {
-                console.log("[Amend Debug] Calling amendCommit...");
-                await amendCommit(activeProfile.repo_path, sha, newMessage);
-                console.log("[Amend Debug] amendCommit returned. Calling loadCommits...");
+                await amendCommit(activeProfile.repo_path, sha, value);
                 await loadCommits();
-                console.log("[Amend Debug] loadCommits returned.");
             } catch (err) {
                 console.error("Failed to amend commit:", err);
                 await message(String(err), { title: "修改说明失败", kind: "error" });
             }
-        } else {
-            console.warn("[Amend Debug] Skipped! Condition was false.");
+        } else if (mode === "branch") {
+            try {
+                await createBranch(activeProfile.repo_path, value.trim(), sha);
+                await loadCommits();
+            } catch (err) {
+                console.error("Failed to create branch:", err);
+                await message(String(err), { title: "创建分支失败", kind: "error" });
+            }
+        }
+    };
+
+    const handleCreateBranch = async (sha: string) => {
+        if (!activeProfile) return;
+        setPromptModal({ isOpen: true, sha, currentMessage: "", mode: "branch" });
+    };
+
+    const handleSwitchBranch = async (branchName: string) => {
+        if (!activeProfile) return;
+        try {
+            await switchBranch(activeProfile.repo_path, branchName);
+            await loadCommits();
+        } catch (err) {
+            console.error("Failed to switch branch:", err);
+            await message(String(err), { title: "切换分支失败", kind: "error" });
         }
     };
 
@@ -244,12 +261,17 @@ export function CommitGraphPage() {
                     🔄 刷新
                 </button>
 
-                {/* Branch tags */}
+                {/* Branch switcher */}
                 <div className="graph-toolbar__branches">
                     {branches.map((b) => (
-                        <span key={b} className="branch-tag">
-                            {b}
-                        </span>
+                        <button
+                            key={b}
+                            className="branch-tag"
+                            onClick={() => handleSwitchBranch(b)}
+                            title={`切换到分支: ${b}`}
+                        >
+                            🌿 {b}
+                        </button>
                     ))}
                 </div>
             </div>
@@ -278,13 +300,14 @@ export function CommitGraphPage() {
                     onResetHard={handleResetHard}
                     onDeleteCommit={handleDeleteCommit}
                     onAmendMessage={handleAmendMessage}
+                    onCreateBranch={handleCreateBranch}
                 />
             )}
 
             {/* Prompt Modal Overlay */}
             <PromptModal
                 isOpen={promptModal.isOpen}
-                title="修改存档说明"
+                title={promptModal.mode === "amend" ? "修改存档说明" : "新分支名称"}
                 defaultValue={promptModal.currentMessage}
                 onConfirm={handlePromptConfirm}
                 onCancel={() => setPromptModal((p) => ({ ...p, isOpen: false }))}

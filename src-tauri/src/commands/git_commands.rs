@@ -51,3 +51,15 @@ pub fn amend_commit(repo_path: &str, commit_sha: &str, new_message: &str) -> Res
 pub fn delete_commit(repo_path: &str, commit_sha: &str) -> Result<(), String> {
     git_service::delete_commit(repo_path, commit_sha).map_err(|e| e.to_string())
 }
+
+/// Create a new branch at a specific commit and switch to it
+#[tauri::command]
+pub fn create_branch(repo_path: &str, branch_name: &str, commit_sha: &str) -> Result<(), String> {
+    git_service::create_branch(repo_path, branch_name, commit_sha).map_err(|e| e.to_string())
+}
+
+/// Switch to an existing branch
+#[tauri::command]
+pub fn switch_branch(repo_path: &str, branch_name: &str) -> Result<(), String> {
+    git_service::switch_branch(repo_path, branch_name).map_err(|e| e.to_string())
+}
