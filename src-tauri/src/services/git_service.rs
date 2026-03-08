@@ -6,8 +6,11 @@ use std::path::Path;
 use git2::{Repository, Signature, IndexAddOption, StatusOptions};
 use crate::models::commit::CommitInfo;
 
-/// Initialize a git repository at the given path (no-op if already a repo)
+// --- Repository Operations ---
+
+/// Initialize a new Git repository
 pub fn init_repo(repo_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[GitService] Initializing repo at: {}", repo_path);
     let path = Path::new(repo_path);
     if path.join(".git").exists() {
         return Ok(());
@@ -16,8 +19,9 @@ pub fn init_repo(repo_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// List all commits across all branches in the repository
+/// Get all commits from the repository (DAG topology)
 pub fn list_commits(repo_path: &str) -> Result<Vec<CommitInfo>, Box<dyn std::error::Error>> {
+    // println!("[GitService] Listing commits for: {}", repo_path); // Might be too noisy
     let repo = Repository::open(repo_path)?;
 
     // Get current HEAD commit SHA
@@ -72,6 +76,7 @@ pub fn list_commits(repo_path: &str) -> Result<Vec<CommitInfo>, Box<dyn std::err
 
 /// Get all local branch names
 pub fn get_branches(repo_path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    println!("[GitService] Getting branches for: {}", repo_path);
     let repo = Repository::open(repo_path)?;
     let branches = repo.branches(Some(git2::BranchType::Local))?;
 
@@ -86,8 +91,9 @@ pub fn get_branches(repo_path: &str) -> Result<Vec<String>, Box<dyn std::error::
     Ok(branch_names)
 }
 
-/// Create a commit with the given message (stages all changes first)
+/// Create a new commit
 pub fn create_commit(repo_path: &str, message: &str) -> Result<String, Box<dyn std::error::Error>> {
+    println!("[GitService] Creating new commit: '{}' at {}", message, repo_path);
     let repo = Repository::open(repo_path)?;
 
     // Stage all changes (add all)
@@ -121,8 +127,9 @@ pub fn create_commit(repo_path: &str, message: &str) -> Result<String, Box<dyn s
     Ok(oid.to_string()[..8].to_string())
 }
 
-/// Checkout to a specific commit (detached HEAD)
+/// Checkout a specific commit
 pub fn checkout_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[GitService] Checking out commit: {} at {}", commit_sha, repo_path);
     let repo = Repository::open(repo_path)?;
 
     // Find the commit by partial SHA
@@ -142,8 +149,9 @@ pub fn checkout_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dyn 
     Ok(())
 }
 
-/// Hard reset the current HEAD to a specific commit (throws away all uncommitted and later commits if not on a branch)
+/// Reset hard to a specific commit (throws away subsequent history)
 pub fn reset_hard_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[GitService] Resetting hard to commit: {} at {}", commit_sha, repo_path);
     let repo = Repository::open(repo_path)?;
 
     let oid = repo.revparse_single(commit_sha)?.id();
@@ -169,6 +177,7 @@ pub fn reset_hard_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dy
 /// Amend the message of a specific historical or current commit
 /// This performs a programmatic rebase if the commit is not HEAD.
 pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Result<String, Box<dyn std::error::Error>> {
+    println!("[GitService] Amending commit {} with new message: '{}'", target_sha, new_message);
     let repo = Repository::open(repo_path)?;
     let target_oid = repo.revparse_single(target_sha)?.id();
 
@@ -185,6 +194,7 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
 
     // Fast path: amending the current HEAD is trivial and quick
     if head_oid == target_oid {
+        println!("[GitService] Target commit is HEAD. Executing fast amend.");
         let sig = Signature::now("Git Game Save Manager", "save@manager.local")?;
         let new_oid = head_commit.amend(
             Some("HEAD"),
@@ -215,6 +225,8 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
         commits_to_replay.push(oid?);
     }
 
+    println!("[GitService] Initiating Programmatic Rebase. Commits to replay: {}", commits_to_replay.len());
+
     // 4. Checkout the target commit in detached state
     repo.set_head_detached(target_oid)?;
     let target_commit = repo.find_commit(target_oid)?;
@@ -233,6 +245,8 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
     
     // Safety check tracking our new ascending HEAD
     let mut current_parent_oid = amended_target_oid;
+    
+    println!("[GitService] Replaying commits...");
 
     // 6. Replay (Cherry-pick) collected commits on top of the new ascending HEAD
     for oid in commits_to_replay {
@@ -262,14 +276,17 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
         // Update working directory progressively
         let current_commit_obj = repo.find_commit(current_parent_oid)?;
         repo.checkout_tree(current_commit_obj.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+        println!("  -> Replayed commit: {}", oid.to_string()[..8].to_string());
     }
 
     // 7. Restore the original reference (if it was a branch) to point to the newly replayed HEAD
     if let Some(ref_name) = branch_name {
+        println!("[GitService] Restoring branch pointer '{}' to {}", ref_name, current_parent_oid.to_string()[..8].to_string());
         repo.reference(&ref_name, current_parent_oid, true, "Programmatic rebase completed")?;
         repo.set_head(&ref_name)?;
     }
     // detached head is already pointing correctly because of Some("HEAD") during repo.commit
 
+    println!("[GitService] Programmatic rebase completed successfully.");
     Ok(amended_target_oid.to_string()[..8].to_string())
 }
