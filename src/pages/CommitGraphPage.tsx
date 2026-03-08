@@ -1,9 +1,25 @@
-// Commit Graph Page — displays commit history
+// Commit Graph Page — React Flow DAG visualization
 // See: /walkthrough/refactor-plan-tauri-v2-migration.md
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+    ReactFlow,
+    MiniMap,
+    Controls,
+    Background,
+    BackgroundVariant,
+    useNodesState,
+    useEdgesState,
+    type NodeMouseHandler,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+
 import { useAppStore } from "../store";
+import { useCommitGraph } from "../hooks/useCommitGraph";
+import { CommitNode } from "../components/CommitNode";
 import * as gitService from "../services/gitService";
+
+const nodeTypes = { commitNode: CommitNode };
 
 export function CommitGraphPage() {
     const {
@@ -20,6 +36,20 @@ export function CommitGraphPage() {
     } = useAppStore();
 
     const [commitMessage, setCommitMessage] = useState("");
+
+    // Convert commits to React Flow data
+    const { nodes: layoutNodes, edges: layoutEdges } = useCommitGraph(
+        commits,
+        selectedCommit
+    );
+    const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges);
+
+    // Sync layout data when commits change
+    useEffect(() => {
+        setNodes(layoutNodes);
+        setEdges(layoutEdges);
+    }, [layoutNodes, layoutEdges]);
 
     useEffect(() => {
         if (config.repo_path) {
@@ -48,14 +78,14 @@ export function CommitGraphPage() {
         }
     };
 
-    const formatTime = (ts: number) => {
-        return new Date(ts * 1000).toLocaleString("zh-CN", {
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    };
+    const onNodeClick: NodeMouseHandler = useCallback(
+        (_, node) => {
+            setSelectedCommit(
+                selectedCommit === node.id ? null : node.id
+            );
+        },
+        [selectedCommit, setSelectedCommit]
+    );
 
     // No repo configured
     if (!config.repo_path) {
@@ -78,16 +108,14 @@ export function CommitGraphPage() {
     }
 
     return (
-        <div className="page" style={{ maxWidth: "100%" }}>
-            <h2 className="page-title">存档视图</h2>
-
-            {error && <div className="error-banner">⚠️ {error}</div>}
+        <div className="graph-page">
+            {error && <div className="error-banner" style={{ margin: "12px 16px 0" }}>⚠️ {error}</div>}
 
             {/* Toolbar */}
-            <div className="toolbar">
+            <div className="graph-toolbar">
                 <input
                     className="input"
-                    style={{ maxWidth: 300 }}
+                    style={{ maxWidth: 280 }}
                     placeholder="存档说明..."
                     value={commitMessage}
                     onChange={(e) => setCommitMessage(e.target.value)}
@@ -109,70 +137,67 @@ export function CommitGraphPage() {
                         className="btn btn-primary"
                         onClick={() => handleCheckout(selectedCommit)}
                     >
-                        ⏪ 恢复到此存档
+                        ⏪ 恢复到 {selectedCommit}
                     </button>
                 )}
-            </div>
 
-            {/* Branch Info */}
-            {branches.length > 0 && (
-                <div className="toolbar">
+                {/* Branch tags */}
+                <div className="graph-toolbar__branches">
                     {branches.map((b) => (
-                        <span key={b} className="branch-tag">
-                            {b}
-                        </span>
+                        <span key={b} className="branch-tag">{b}</span>
                     ))}
                 </div>
-            )}
+            </div>
 
             {/* Loading */}
             {loading && <div className="loading-spinner">加载中...</div>}
 
-            {/* Commit List */}
+            {/* Empty */}
             {!loading && commits.length === 0 && (
                 <div className="empty-state">
                     <div className="empty-icon">📝</div>
                     <div className="empty-text">暂无存档记录</div>
-                    <div className="empty-hint">
-                        输入说明并点击"保存存档"创建第一个存档
-                    </div>
+                    <div className="empty-hint">输入说明并点击"保存存档"创建第一个存档</div>
                 </div>
             )}
 
+            {/* React Flow DAG */}
             {!loading && commits.length > 0 && (
-                <div className="commit-list">
-                    {commits.map((commit) => (
-                        <div
-                            key={commit.hex_sha}
-                            className={`commit-item ${selectedCommit === commit.hex_sha ? "selected" : ""
-                                }`}
-                            onClick={() =>
-                                setSelectedCommit(
-                                    selectedCommit === commit.hex_sha ? null : commit.hex_sha
-                                )
-                            }
-                        >
-                            <span className="commit-sha">{commit.hex_sha}</span>
-                            <div>
-                                <div className="commit-message">{commit.message}</div>
-                                <div className="commit-meta">
-                                    <span>{commit.author}</span>
-                                    <span>·</span>
-                                    <span>{formatTime(commit.timestamp)}</span>
-                                    {commit.branches.map((b) => (
-                                        <span key={b} className="branch-tag">
-                                            {b}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="commit-meta">
-                                {commit.parents.length > 0 && (
-                                    <span>← {commit.parents.join(", ")}</span>
-                                )}
-                            </div>
-                        </div>
-                    ))}
+                <div className="graph-container">
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onNodeClick={onNodeClick}
+                        nodeTypes={nodeTypes}
+                        fitView
+                        fitViewOptions={{ padding: 0.3 }}
+                        minZoom={0.1}
+                        maxZoom={2}
+                        defaultEdgeOptions={{
+                            type: "smoothstep",
+                            style: { stroke: "var(--accent)", strokeWidth: 2 },
+                        }}
+                        proOptions={{ hideAttribution: true }}
+                    >
+                        <Background
+                            variant={BackgroundVariant.Dots}
+                            gap={20}
+                            size={1}
+                            color="var(--border-subtle)"
+                        />
+                        <Controls
+                            showInteractive={false}
+                            position="bottom-right"
+                        />
+                        <MiniMap
+                            nodeStrokeColor="var(--accent)"
+                            nodeColor="var(--bg-tertiary)"
+                            maskColor="rgba(0, 0, 0, 0.6)"
+                            style={{ background: "var(--bg-secondary)" }}
+                        />
+                    </ReactFlow>
                 </div>
             )}
         </div>
