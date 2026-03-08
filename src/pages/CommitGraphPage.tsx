@@ -17,6 +17,7 @@ import "@xyflow/react/dist/style.css";
 import { useAppStore } from "../store";
 import { useCommitGraph } from "../hooks/useCommitGraph";
 import { CommitNode } from "../components/CommitNode";
+import { CommitDetailPanel } from "../components/CommitDetailPanel";
 import * as gitService from "../services/gitService";
 
 const nodeTypes = { commitNode: CommitNode };
@@ -28,7 +29,7 @@ export function CommitGraphPage() {
         loading,
         error,
         loadCommits,
-        config,
+        activeProfile,
         selectedCommit,
         setSelectedCommit,
         setError,
@@ -36,6 +37,11 @@ export function CommitGraphPage() {
     } = useAppStore();
 
     const [commitMessage, setCommitMessage] = useState("");
+
+    // Find selected commit data
+    const selectedCommitData = commits.find(
+        (c) => c.hex_sha === selectedCommit
+    );
 
     // Convert commits to React Flow data
     const { nodes: layoutNodes, edges: layoutEdges } = useCommitGraph(
@@ -52,15 +58,18 @@ export function CommitGraphPage() {
     }, [layoutNodes, layoutEdges]);
 
     useEffect(() => {
-        if (config.repo_path) {
+        if (activeProfile) {
             loadCommits();
         }
-    }, [config.repo_path]);
+    }, [activeProfile?.id]);
 
     const handleCreateCommit = async () => {
-        if (!config.repo_path || !commitMessage.trim()) return;
+        if (!activeProfile || !commitMessage.trim()) return;
         try {
-            await gitService.createCommit(config.repo_path, commitMessage.trim());
+            await gitService.createCommit(
+                activeProfile.repo_path,
+                commitMessage.trim()
+            );
             setCommitMessage("");
             loadCommits();
         } catch (e) {
@@ -69,9 +78,10 @@ export function CommitGraphPage() {
     };
 
     const handleCheckout = async (sha: string) => {
-        if (!config.repo_path) return;
+        if (!activeProfile) return;
         try {
-            await gitService.checkoutCommit(config.repo_path, sha);
+            await gitService.checkoutCommit(activeProfile.repo_path, sha);
+            setSelectedCommit(null);
             loadCommits();
         } catch (e) {
             setError(String(e));
@@ -80,21 +90,19 @@ export function CommitGraphPage() {
 
     const onNodeClick: NodeMouseHandler = useCallback(
         (_, node) => {
-            setSelectedCommit(
-                selectedCommit === node.id ? null : node.id
-            );
+            setSelectedCommit(selectedCommit === node.id ? null : node.id);
         },
         [selectedCommit, setSelectedCommit]
     );
 
-    // No repo configured
-    if (!config.repo_path) {
+    // No profile configured
+    if (!activeProfile) {
         return (
             <div className="page">
                 <div className="empty-state">
                     <div className="empty-icon">📂</div>
-                    <div className="empty-text">尚未配置存档目录</div>
-                    <div className="empty-hint">请先在配置管理中选择存档目录</div>
+                    <div className="empty-text">尚未配置游戏存档</div>
+                    <div className="empty-hint">请先在配置管理中添加游戏</div>
                     <button
                         className="btn btn-primary"
                         style={{ marginTop: 16 }}
@@ -109,10 +117,18 @@ export function CommitGraphPage() {
 
     return (
         <div className="graph-page">
-            {error && <div className="error-banner" style={{ margin: "12px 16px 0" }}>⚠️ {error}</div>}
+            {error && (
+                <div className="error-banner" style={{ margin: "12px 16px 0" }}>
+                    ⚠️ {error}
+                </div>
+            )}
 
             {/* Toolbar */}
             <div className="graph-toolbar">
+                <span className="graph-toolbar__game">
+                    {activeProfile.icon} {activeProfile.name}
+                </span>
+                <div className="graph-toolbar__separator" />
                 <input
                     className="input"
                     style={{ maxWidth: 280 }}
@@ -132,19 +148,12 @@ export function CommitGraphPage() {
                     🔄 刷新
                 </button>
 
-                {selectedCommit && (
-                    <button
-                        className="btn btn-primary"
-                        onClick={() => handleCheckout(selectedCommit)}
-                    >
-                        ⏪ 恢复到 {selectedCommit}
-                    </button>
-                )}
-
                 {/* Branch tags */}
                 <div className="graph-toolbar__branches">
                     {branches.map((b) => (
-                        <span key={b} className="branch-tag">{b}</span>
+                        <span key={b} className="branch-tag">
+                            {b}
+                        </span>
                     ))}
                 </div>
             </div>
@@ -157,47 +166,57 @@ export function CommitGraphPage() {
                 <div className="empty-state">
                     <div className="empty-icon">📝</div>
                     <div className="empty-text">暂无存档记录</div>
-                    <div className="empty-hint">输入说明并点击"保存存档"创建第一个存档</div>
+                    <div className="empty-hint">
+                        输入说明并点击"保存存档"创建第一个存档
+                    </div>
                 </div>
             )}
 
-            {/* React Flow DAG */}
+            {/* React Flow DAG + Detail Panel */}
             {!loading && commits.length > 0 && (
-                <div className="graph-container">
-                    <ReactFlow
-                        nodes={nodes}
-                        edges={edges}
-                        onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
-                        onNodeClick={onNodeClick}
-                        nodeTypes={nodeTypes}
-                        fitView
-                        fitViewOptions={{ padding: 0.3 }}
-                        minZoom={0.1}
-                        maxZoom={2}
-                        defaultEdgeOptions={{
-                            type: "smoothstep",
-                            style: { stroke: "var(--accent)", strokeWidth: 2 },
-                        }}
-                        proOptions={{ hideAttribution: true }}
-                    >
-                        <Background
-                            variant={BackgroundVariant.Dots}
-                            gap={20}
-                            size={1}
-                            color="var(--border-subtle)"
+                <div className="graph-main">
+                    <div className="graph-container">
+                        <ReactFlow
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onNodeClick={onNodeClick}
+                            nodeTypes={nodeTypes}
+                            fitView
+                            fitViewOptions={{ padding: 0.3 }}
+                            minZoom={0.1}
+                            maxZoom={2}
+                            defaultEdgeOptions={{
+                                type: "smoothstep",
+                                style: { stroke: "var(--accent)", strokeWidth: 2 },
+                            }}
+                            proOptions={{ hideAttribution: true }}
+                        >
+                            <Background
+                                variant={BackgroundVariant.Dots}
+                                gap={20}
+                                size={1}
+                                color="var(--border-subtle)"
+                            />
+                            <Controls showInteractive={false} position="bottom-right" />
+                            <MiniMap
+                                nodeStrokeColor="var(--accent)"
+                                nodeColor="var(--bg-tertiary)"
+                                maskColor="rgba(0, 0, 0, 0.6)"
+                                style={{ background: "var(--bg-secondary)" }}
+                            />
+                        </ReactFlow>
+                    </div>
+
+                    {/* Detail Panel */}
+                    {selectedCommitData && (
+                        <CommitDetailPanel
+                            commit={selectedCommitData}
+                            onCheckout={handleCheckout}
+                            onClose={() => setSelectedCommit(null)}
                         />
-                        <Controls
-                            showInteractive={false}
-                            position="bottom-right"
-                        />
-                        <MiniMap
-                            nodeStrokeColor="var(--accent)"
-                            nodeColor="var(--bg-tertiary)"
-                            maskColor="rgba(0, 0, 0, 0.6)"
-                            style={{ background: "var(--bg-secondary)" }}
-                        />
-                    </ReactFlow>
+                    )}
                 </div>
             )}
         </div>

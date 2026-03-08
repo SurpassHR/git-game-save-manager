@@ -5,18 +5,31 @@ import { CommitGraphPage } from "./pages/CommitGraphPage";
 import "./App.css";
 
 function App() {
-  const { currentPage, setCurrentPage, loadConfig, config } = useAppStore();
+  const {
+    currentPage,
+    setCurrentPage,
+    loadConfig,
+    config,
+    activeProfile,
+    switchProfile,
+    setTheme,
+  } = useAppStore();
 
+  // Load config on mount + apply theme
   useEffect(() => {
     loadConfig();
   }, []);
 
-  // Auto-switch to graph page if repo is configured
   useEffect(() => {
-    if (config.repo_path) {
+    document.documentElement.dataset.theme = config.theme;
+  }, [config.theme]);
+
+  // Auto-switch to graph page if there's an active profile
+  useEffect(() => {
+    if (activeProfile) {
       setCurrentPage("graph");
     }
-  }, [config.repo_path]);
+  }, [activeProfile?.id]);
 
   return (
     <div className="app-layout">
@@ -26,6 +39,23 @@ function App() {
           <h1 className="sidebar-title">GGSM</h1>
           <span className="sidebar-subtitle">Game Save Manager</span>
         </div>
+
+        {/* Game Profile Selector */}
+        {config.profiles.length > 0 && (
+          <div className="sidebar-profile-selector">
+            <select
+              className="profile-select"
+              value={config.active_profile_id}
+              onChange={(e) => switchProfile(e.target.value)}
+            >
+              {config.profiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.icon} {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="sidebar-nav">
           <button
@@ -41,6 +71,23 @@ function App() {
           >
             <span className="nav-icon">⚙️</span>
             <span className="nav-label">配置管理</span>
+          </button>
+        </div>
+
+        {/* Theme Toggle */}
+        <div className="sidebar-actions">
+          <button
+            className="nav-item theme-toggle"
+            onClick={() =>
+              setTheme(config.theme === "dark" ? "light" : "dark")
+            }
+          >
+            <span className="nav-icon">
+              {config.theme === "dark" ? "🌙" : "☀️"}
+            </span>
+            <span className="nav-label">
+              {config.theme === "dark" ? "深色" : "浅色"}
+            </span>
           </button>
         </div>
 

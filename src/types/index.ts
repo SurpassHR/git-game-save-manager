@@ -18,8 +18,17 @@ export interface BranchInfo {
     is_current: boolean;
 }
 
+/** Matches `GameProfile` in src-tauri/src/models/config.rs */
+export interface GameProfile {
+    id: string;
+    name: string;
+    repo_path: string;
+    icon: string;
+}
+
 /** Matches `AppConfig` in src-tauri/src/models/config.rs */
 export interface AppConfig {
     theme: "light" | "dark";
-    repo_path: string;
+    active_profile_id: string;
+    profiles: GameProfile[];
 }

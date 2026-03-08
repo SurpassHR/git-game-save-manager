@@ -22,6 +22,9 @@ pub fn run() {
             // Config commands
             get_config,
             set_config,
+            add_profile,
+            remove_profile,
+            set_active_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

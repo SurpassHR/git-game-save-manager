@@ -2,7 +2,7 @@
 // See: /arch/adr-001-tauri-v2-migration.md
 
 import { create } from "zustand";
-import type { CommitInfo, AppConfig } from "../types";
+import type { CommitInfo, AppConfig, GameProfile } from "../types";
 import * as gitService from "../services/gitService";
 import * as configService from "../services/configService";
 
@@ -11,7 +11,14 @@ interface AppState {
     config: AppConfig;
     setConfig: (config: AppConfig) => void;
     loadConfig: () => Promise<void>;
-    saveConfig: (config: Partial<AppConfig>) => Promise<void>;
+    saveConfig: (config: AppConfig) => Promise<void>;
+
+    // Profile helpers
+    activeProfile: GameProfile | null;
+    addProfile: (name: string, repoPath: string, icon: string) => Promise<void>;
+    removeProfile: (id: string) => Promise<void>;
+    switchProfile: (id: string) => Promise<void>;
+    setTheme: (theme: "light" | "dark") => Promise<void>;
 
     // Commits
     commits: CommitInfo[];
@@ -34,26 +41,88 @@ interface AppState {
     setError: (error: string | null) => void;
 }
 
+function getActiveProfile(config: AppConfig): GameProfile | null {
+    return (
+        config.profiles.find((p) => p.id === config.active_profile_id) ?? null
+    );
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
     // Config
-    config: { theme: "dark", repo_path: "" },
-    setConfig: (config) => set({ config }),
+    config: { theme: "dark", active_profile_id: "", profiles: [] },
+    setConfig: (config) =>
+        set({ config, activeProfile: getActiveProfile(config) }),
 
     loadConfig: async () => {
         try {
             const config = await configService.getConfig();
-            set({ config });
+            set({ config, activeProfile: getActiveProfile(config) });
         } catch (e) {
             set({ error: String(e) });
         }
     },
 
-    saveConfig: async (partial) => {
+    saveConfig: async (config) => {
+        try {
+            await configService.setConfig(config);
+            set({ config, activeProfile: getActiveProfile(config), error: null });
+        } catch (e) {
+            set({ error: String(e) });
+        }
+    },
+
+    // Profile helpers
+    activeProfile: null,
+
+    addProfile: async (name, repoPath, icon) => {
+        try {
+            const config = await configService.addProfile(name, repoPath, icon);
+            set({ config, activeProfile: getActiveProfile(config), error: null });
+        } catch (e) {
+            set({ error: String(e) });
+        }
+    },
+
+    removeProfile: async (id) => {
+        try {
+            const config = await configService.removeProfile(id);
+            set({
+                config,
+                activeProfile: getActiveProfile(config),
+                error: null,
+                commits: [],
+                branches: [],
+            });
+        } catch (e) {
+            set({ error: String(e) });
+        }
+    },
+
+    switchProfile: async (id) => {
+        try {
+            const config = await configService.setActiveProfile(id);
+            set({
+                config,
+                activeProfile: getActiveProfile(config),
+                error: null,
+                commits: [],
+                branches: [],
+                selectedCommit: null,
+            });
+            // Re-load commits for new profile
+            get().loadCommits();
+        } catch (e) {
+            set({ error: String(e) });
+        }
+    },
+
+    setTheme: async (theme) => {
         const current = get().config;
-        const updated = { ...current, ...partial };
+        const updated = { ...current, theme };
         try {
             await configService.setConfig(updated);
             set({ config: updated, error: null });
+            document.documentElement.dataset.theme = theme;
         } catch (e) {
             set({ error: String(e) });
         }
@@ -64,13 +133,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     setCommits: (commits) => set({ commits }),
 
     loadCommits: async () => {
-        const repoPath = get().config.repo_path;
-        if (!repoPath) return;
+        const profile = get().activeProfile;
+        if (!profile) return;
         set({ loading: true, error: null });
         try {
             const [commits, branches] = await Promise.all([
-                gitService.listCommits(repoPath),
-                gitService.getBranches(repoPath),
+                gitService.listCommits(profile.repo_path),
+                gitService.getBranches(profile.repo_path),
             ]);
             set({ commits, branches, loading: false });
         } catch (e) {
