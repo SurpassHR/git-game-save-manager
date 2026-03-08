@@ -215,6 +215,7 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
     }
 
     // 3. Collect the path from HEAD down to the CHILD of target_commit
+    println!("[GitService] Collecting rebase path from {} down to {}", head_oid, target_oid);
     let mut revwalk = repo.revwalk()?;
     revwalk.push(head_oid)?;
     revwalk.hide(target_oid)?;
@@ -222,17 +223,21 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
 
     let mut commits_to_replay = Vec::new();
     for oid in revwalk {
-        commits_to_replay.push(oid?);
+        let oid = oid.map_err(|e| format!("Failed revwalk iteration: {}", e))?;
+        commits_to_replay.push(oid);
     }
 
     println!("[GitService] Initiating Programmatic Rebase. Commits to replay: {}", commits_to_replay.len());
 
     // 4. Checkout the target commit in detached state
-    repo.set_head_detached(target_oid)?;
+    println!("[GitService] Detaching HEAD at target commit.");
+    repo.set_head_detached(target_oid).map_err(|e| format!("Failed to detach head: {}", e))?;
     let target_commit = repo.find_commit(target_oid)?;
-    repo.checkout_tree(target_commit.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+    repo.checkout_tree(target_commit.as_object(), Some(git2::build::CheckoutBuilder::new().force()))
+        .map_err(|e| format!("Failed checkout_tree on detaching head: {}", e))?;
 
     // 5. Amend the target commit
+    println!("[GitService] Amending target detached HEAD.");
     let sig = Signature::now("Git Game Save Manager", "save@manager.local")?;
     let amended_target_oid = target_commit.amend(
         Some("HEAD"),
@@ -241,7 +246,7 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
         None,
         Some(new_message),
         None, // Use same tree
-    )?;
+    ).map_err(|e| format!("Failed to amend detached head: {}", e))?;
     
     // Safety check tracking our new ascending HEAD
     let mut current_parent_oid = amended_target_oid;
@@ -250,13 +255,21 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
 
     // 6. Replay (Cherry-pick) collected commits on top of the new ascending HEAD
     for oid in commits_to_replay {
-        let commit_to_replay = repo.find_commit(oid)?;
+        println!("[GitService] Cherry-picking commit {} onto {}", oid, current_parent_oid);
+        let commit_to_replay = repo.find_commit(oid)
+            .map_err(|e| format!("Cherry-pick find commit failed: {}", e))?;
         
         let parent_commit = repo.find_commit(current_parent_oid)?;
-        let mut index = repo.cherrypick_commit(&commit_to_replay, &parent_commit, 0, None)?;
+        let mut index = repo.cherrypick_commit(&commit_to_replay, &parent_commit, 0, None)
+            .map_err(|e| format!("Cherry-pick operation failed on commit {}: {}", oid, e))?;
         
+        if index.has_conflicts() {
+            return Err(format!("Conflict detected during programmatic rebase at commit {}", oid).into());
+        }
+
         // Write the new tree from the cherry-pick index
-        let tree_oid = index.write_tree_to(&repo)?;
+        let tree_oid = index.write_tree_to(&repo)
+            .map_err(|e| format!("Failed writing tree after cherry-pick: {}", e))?;
         let tree = repo.find_tree(tree_oid)?;
         
         // Re-create the commit
@@ -271,11 +284,12 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
             message,
             &tree,
             &[&parent_commit]
-        )?;
+        ).map_err(|e| format!("Failed committing replayed node: {}", e))?;
 
         // Update working directory progressively
         let current_commit_obj = repo.find_commit(current_parent_oid)?;
-        repo.checkout_tree(current_commit_obj.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+        repo.checkout_tree(current_commit_obj.as_object(), Some(git2::build::CheckoutBuilder::new().force()))
+            .map_err(|e| format!("Failed repo.checkout_tree progressive step: {}", e))?;
         println!("  -> Replayed commit: {}", oid.to_string()[..8].to_string());
     }
 
