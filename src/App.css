@@ -9,6 +9,7 @@
 /* Default (dark) theme */
 :root,
 [data-theme="dark"] {
+  --color-scheme: dark;
   --bg-primary: #1a1b1e;
   --bg-secondary: #25262b;
   --bg-tertiary: #2c2e33;
@@ -47,6 +48,7 @@
 
 /* Light theme */
 [data-theme="light"] {
+  --color-scheme: light;
   --bg-primary: #f8f9fa;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f1f3f5;
@@ -567,6 +569,12 @@ body {
   font-family: inherit;
   outline: none;
   cursor: pointer;
+  color-scheme: var(--color-scheme, dark);
+}
+
+.profile-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .profile-select:focus {

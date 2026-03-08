@@ -31,7 +31,14 @@ pub fn load_config() -> Result<AppConfig, Box<dyn std::error::Error>> {
         return Ok(AppConfig::default());
     }
     let content = fs::read_to_string(&path)?;
-    let config: AppConfig = toml::from_str(&content)?;
+    let mut config: AppConfig = toml::from_str(&content)?;
+
+    // Migrate legacy repo_path → profile
+    config.migrate_legacy();
+
+    // Re-save to clean up legacy fields
+    save_config(&config)?;
+
     Ok(config)
 }
 
