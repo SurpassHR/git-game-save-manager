@@ -294,13 +294,31 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
         println!("  -> Replayed commit: {}", oid.to_string()[..8].to_string());
     }
 
-    // 7. Restore the original reference (if it was a branch) to point to the newly replayed HEAD
-    if let Some(ref_name) = branch_name {
-        println!("[GitService] Restoring branch pointer '{}' to {}", ref_name, current_parent_oid.to_string()[..8].to_string());
-        repo.reference(&ref_name, current_parent_oid, true, "Programmatic rebase completed")?;
-        repo.set_head(&ref_name)?;
+    // 7. Update all references to ensure consistency
+    // Always find branches that pointed to the OLD head and update them to the NEW replayed tip
+    let branches = repo.branches(Some(git2::BranchType::Local))?;
+    for branch_result in branches {
+        let (branch, _) = branch_result?;
+        if let Some(target) = branch.get().target() {
+            if target == head_oid {
+                let ref_name = branch.get().name().unwrap_or("").to_string();
+                if !ref_name.is_empty() {
+                    println!("[GitService] Updating stale branch '{}' from {} to {}", ref_name, head_oid.to_string()[..8].to_string(), current_parent_oid.to_string()[..8].to_string());
+                    repo.reference(&ref_name, current_parent_oid, true, "Programmatic rebase: update branch pointer")?;
+                }
+            }
+        }
     }
-    // detached head is already pointing correctly because of Some("HEAD") during repo.commit
+
+    // If we were on a named branch, restore HEAD to point to it
+    if let Some(ref_name) = branch_name {
+        println!("[GitService] Restoring HEAD to branch '{}'", ref_name);
+        repo.set_head(&ref_name)?;
+    } else {
+        // Detached HEAD: just make sure it points to the final replayed commit
+        println!("[GitService] Updating detached HEAD to {}", current_parent_oid.to_string()[..8].to_string());
+        repo.set_head_detached(current_parent_oid)?;
+    }
 
     println!("[GitService] Programmatic rebase completed successfully.");
     Ok(amended_target_oid.to_string()[..8].to_string())
