@@ -204,6 +204,23 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
             Some(new_message),
             None // Use same tree
         )?;
+        println!("[GitService] Fast amend created new OID: {}", new_oid.to_string()[..8].to_string());
+
+        // CRITICAL: also update any branch refs that pointed to the old HEAD
+        let branches = repo.branches(Some(git2::BranchType::Local))?;
+        for branch_result in branches {
+            let (branch, _) = branch_result?;
+            if let Some(target) = branch.get().target() {
+                if target == head_oid {
+                    let ref_name = branch.get().name().unwrap_or("").to_string();
+                    if !ref_name.is_empty() {
+                        println!("[GitService] Updating stale branch '{}' from {} to {}", ref_name, head_oid.to_string()[..8].to_string(), new_oid.to_string()[..8].to_string());
+                        repo.reference(&ref_name, new_oid, true, "Fast amend: update branch pointer")?;
+                    }
+                }
+            }
+        }
+
         return Ok(new_oid.to_string()[..8].to_string());
     }
 
