@@ -141,3 +141,52 @@ pub fn checkout_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dyn 
 
     Ok(())
 }
+
+/// Hard reset the current HEAD to a specific commit (throws away all uncommitted and later commits if not on a branch)
+pub fn reset_hard_commit(repo_path: &str, commit_sha: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let repo = Repository::open(repo_path)?;
+
+    let oid = repo.revparse_single(commit_sha)?.id();
+    let commit = repo.find_commit(oid)?;
+    let tree = commit.tree()?;
+
+    // Reset hard!
+    repo.reset(commit.as_object(), git2::ResetType::Hard, Some(
+        git2::build::CheckoutBuilder::new()
+            .force()
+            .remove_untracked(true)
+    ))?;
+
+    // We also want to ensure HEAD points firmly to this commit
+    // If we're detached, we set it detached. If we're on a branch, reset updates the branch reference automatically.
+    if repo.head_detached().unwrap_or(true) {
+        repo.set_head_detached(oid)?;
+    }
+
+    Ok(())
+}
+
+/// Amend the message of the current HEAD commit
+pub fn amend_commit(repo_path: &str, new_message: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let repo = Repository::open(repo_path)?;
+
+    // Get current HEAD
+    let mut head_ref = repo.head()?;
+    let head_commit = head_ref.peel_to_commit()?;
+    let tree = head_commit.tree()?;
+
+    // Git signature
+    let sig = Signature::now("Git Game Save Manager", "save@manager.local")?;
+
+    // Execute amend
+    let new_oid = head_commit.amend(
+        Some("HEAD"),
+        Some(&sig),
+        Some(&sig),
+        None,
+        Some(new_message),
+        Some(&tree)
+    )?;
+
+    Ok(new_oid.to_string()[..8].to_string())
+}

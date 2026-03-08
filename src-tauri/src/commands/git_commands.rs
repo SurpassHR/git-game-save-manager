@@ -33,3 +33,15 @@ pub fn create_commit(repo_path: &str, message: &str) -> Result<String, String> {
 pub fn checkout_commit(repo_path: &str, commit_sha: &str) -> Result<(), String> {
     git_service::checkout_commit(repo_path, commit_sha).map_err(|e| e.to_string())
 }
+
+/// Hard reset to a specific commit
+#[tauri::command]
+pub fn reset_hard_commit(repo_path: &str, commit_sha: &str) -> Result<(), String> {
+    git_service::reset_hard_commit(repo_path, commit_sha).map_err(|e| e.to_string())
+}
+
+/// Amend current commit message
+#[tauri::command]
+pub fn amend_commit(repo_path: &str, new_message: &str) -> Result<String, String> {
+    git_service::amend_commit(repo_path, new_message).map_err(|e| e.to_string())
+}

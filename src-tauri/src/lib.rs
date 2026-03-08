@@ -19,6 +19,8 @@ pub fn run() {
             init_repo,
             create_commit,
             checkout_commit,
+            reset_hard_commit,
+            amend_commit,
             // Config commands
             get_config,
             set_config,

@@ -11,6 +11,7 @@ import {
     useNodesState,
     useEdgesState,
     type NodeMouseHandler,
+    type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -18,7 +19,10 @@ import { useAppStore } from "../store";
 import { useCommitGraph } from "../hooks/useCommitGraph";
 import { CommitNode } from "../components/CommitNode";
 import { CommitDetailPanel } from "../components/CommitDetailPanel";
+import { resetHard, amendCommit } from "../services/gitService";
 import * as gitService from "../services/gitService";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { ContextMenu } from "../components/ContextMenu";
 
 const nodeTypes = { commitNode: CommitNode };
 
@@ -37,6 +41,14 @@ export function CommitGraphPage() {
     } = useAppStore();
 
     const [commitMessage, setCommitMessage] = useState("");
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        commitSha: string;
+        isCurrent: boolean;
+    } | null>(null);
 
     // Find selected commit data
     const selectedCommitData = commits.find(
@@ -61,7 +73,7 @@ export function CommitGraphPage() {
         if (activeProfile) {
             loadCommits();
         }
-    }, [activeProfile?.id]);
+    }, [activeProfile]);
 
     const handleCreateCommit = async () => {
         if (!activeProfile || !commitMessage.trim()) return;
@@ -94,6 +106,53 @@ export function CommitGraphPage() {
         },
         [selectedCommit, setSelectedCommit]
     );
+
+    const onNodeContextMenu = useCallback(
+        (event: React.MouseEvent, node: Node) => {
+            event.preventDefault();
+            const d = node.data as { hexSha: string; isCurrent: boolean };
+            setContextMenu({
+                x: event.clientX,
+                y: event.clientY,
+                commitSha: d.hexSha,
+                isCurrent: d.isCurrent,
+            });
+        },
+        []
+    );
+
+    const handleResetHard = async (sha: string) => {
+        if (!activeProfile) return;
+        const confirmed = await ask(
+            `警告：这将恢复到存档 ${sha}，并且丢弃此后产生的所有未来存档和未提交数据。确定要继续吗？`,
+            { title: "恢复存档并切除未来", kind: "warning" }
+        );
+        if (confirmed) {
+            try {
+                await resetHard(activeProfile.repo_path, sha);
+                await loadCommits();
+            } catch (err) {
+                console.error("Failed to reset hard:", err);
+            }
+        }
+    };
+
+    const handleAmendMessage = async (sha: string) => {
+        if (!activeProfile) return;
+        const currentMessage = commits.find((c) => c.hex_sha === sha)?.message || "";
+
+        // Use native window.prompt as @tauri-apps/plugin-dialog v2 does not have `prompt`
+        const newMessage = window.prompt("修改当前存档说明:", currentMessage);
+
+        if (newMessage && newMessage !== currentMessage) {
+            try {
+                await amendCommit(activeProfile.repo_path, newMessage);
+                await loadCommits();
+            } catch (err) {
+                console.error("Failed to amend commit:", err);
+            }
+        }
+    };
 
     // No profile configured
     if (!activeProfile) {
@@ -172,6 +231,19 @@ export function CommitGraphPage() {
                 </div>
             )}
 
+            {/* Context Menu Overlay */}
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    commitSha={contextMenu.commitSha}
+                    isCurrent={contextMenu.isCurrent}
+                    onClose={() => setContextMenu(null)}
+                    onResetHard={handleResetHard}
+                    onAmendMessage={handleAmendMessage}
+                />
+            )}
+
             {/* React Flow DAG + Detail Panel */}
             {!loading && commits.length > 0 && (
                 <div className="graph-main">
@@ -182,16 +254,19 @@ export function CommitGraphPage() {
                             onNodesChange={onNodesChange}
                             onEdgesChange={onEdgesChange}
                             onNodeClick={onNodeClick}
+                            onNodeContextMenu={onNodeContextMenu}
+                            onPaneClick={() => setContextMenu(null)}
                             nodeTypes={nodeTypes}
                             fitView
                             fitViewOptions={{ padding: 0.3 }}
-                            minZoom={0.1}
+                            minZoom={0.2}
                             maxZoom={2}
                             defaultEdgeOptions={{
                                 type: "smoothstep",
                                 style: { stroke: "var(--accent)", strokeWidth: 2 },
                             }}
                             proOptions={{ hideAttribution: true }}
+                            onlyRenderVisibleElements={true}
                         >
                             <Background
                                 variant={BackgroundVariant.Dots}

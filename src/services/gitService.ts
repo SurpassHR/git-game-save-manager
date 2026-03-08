@@ -44,3 +44,23 @@ export async function checkoutCommit(
 ): Promise<void> {
     return invoke<void>("checkout_commit", { repoPath, commitSha });
 }
+
+/**
+ * Hard reset to a specific commit (discards all later detached history)
+ */
+export async function resetHard(
+    repoPath: string,
+    commitSha: string
+): Promise<void> {
+    return invoke<void>("reset_hard_commit", { repoPath, commitSha });
+}
+
+/**
+ * Amend the message of the current HEAD commit
+ */
+export async function amendCommit(
+    repoPath: string,
+    newMessage: string
+): Promise<string> {
+    return invoke<string>("amend_commit", { repoPath, newMessage });
+}
