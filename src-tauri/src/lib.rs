@@ -21,6 +21,7 @@ pub fn run() {
             checkout_commit,
             reset_hard_commit,
             amend_commit,
+            delete_commit,
             // Config commands
             get_config,
             set_config,

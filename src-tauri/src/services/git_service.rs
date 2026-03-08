@@ -347,3 +347,109 @@ pub fn amend_commit(repo_path: &str, target_sha: &str, new_message: &str) -> Res
     println!("[GitService] Programmatic rebase completed successfully.");
     Ok(amended_target_oid.to_string()[..8].to_string())
 }
+
+/// Delete a specific commit from history by replaying descendants onto its parent.
+pub fn delete_commit(repo_path: &str, target_sha: &str) -> Result<(), Box<dyn std::error::Error>> {
+    println!("[GitService] Deleting commit {} from {}", target_sha, repo_path);
+    let repo = Repository::open(repo_path)?;
+    let target_oid = repo.revparse_single(target_sha)?.id();
+    let target_commit = repo.find_commit(target_oid)?;
+
+    if target_commit.parent_count() == 0 {
+        return Err("无法删除初始存档（根节点）。".into());
+    }
+    let parent_oid = target_commit.parent_id(0)?;
+
+    let head_ref = repo.head()?;
+    let is_branch = head_ref.is_branch();
+    let branch_name = if is_branch { head_ref.name().map(String::from) } else { None };
+    let head_commit = head_ref.peel_to_commit()?;
+    let head_oid = head_commit.id();
+
+    // Fast path: deleting HEAD = reset to parent
+    if head_oid == target_oid {
+        println!("[GitService] Target is HEAD. Resetting to parent {}.", parent_oid.to_string()[..8].to_string());
+        let parent_commit = repo.find_commit(parent_oid)?;
+        repo.checkout_tree(parent_commit.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+
+        // Update branch refs
+        let branches = repo.branches(Some(git2::BranchType::Local))?;
+        for br in branches {
+            let (branch, _) = br?;
+            if let Some(t) = branch.get().target() {
+                if t == head_oid {
+                    let rn = branch.get().name().unwrap_or("").to_string();
+                    if !rn.is_empty() {
+                        repo.reference(&rn, parent_oid, true, "Delete HEAD commit")?;
+                    }
+                }
+            }
+        }
+        if let Some(ref_name) = branch_name {
+            repo.set_head(&ref_name)?;
+        } else {
+            repo.set_head_detached(parent_oid)?;
+        }
+        println!("[GitService] HEAD commit deleted.");
+        return Ok(());
+    }
+
+    // Historical: must be ancestor of HEAD
+    if !repo.graph_descendant_of(head_oid, target_oid)? {
+        return Err("该存档不是当前存档的直系祖先，无法安全删除。".into());
+    }
+
+    // Collect descendants (HEAD..target, exclusive of target)
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push(head_oid)?;
+    revwalk.hide(target_oid)?;
+    revwalk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::REVERSE)?;
+    let mut to_replay: Vec<git2::Oid> = Vec::new();
+    for oid in revwalk { to_replay.push(oid?); }
+
+    println!("[GitService] Replaying {} commits onto parent {}", to_replay.len(), parent_oid.to_string()[..8].to_string());
+
+    // Checkout target's parent
+    let parent_commit = repo.find_commit(parent_oid)?;
+    repo.set_head_detached(parent_oid)?;
+    repo.checkout_tree(parent_commit.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+
+    let mut cur = parent_oid;
+    for oid in to_replay {
+        let c = repo.find_commit(oid)?;
+        let p = repo.find_commit(cur)?;
+        let mut idx = repo.cherrypick_commit(&c, &p, 0, None)
+            .map_err(|e| format!("Cherry-pick failed on {}: {}", oid, e))?;
+        if idx.has_conflicts() {
+            return Err(format!("冲突: {}", oid).into());
+        }
+        let tree_oid = idx.write_tree_to(&repo)?;
+        let tree = repo.find_tree(tree_oid)?;
+        cur = repo.commit(Some("HEAD"), &c.author(), &c.committer(), c.message().unwrap_or(""), &tree, &[&p])?;
+        let obj = repo.find_commit(cur)?;
+        repo.checkout_tree(obj.as_object(), Some(git2::build::CheckoutBuilder::new().force()))?;
+        println!("  -> Replayed: {}", oid.to_string()[..8].to_string());
+    }
+
+    // Update branch refs
+    let branches = repo.branches(Some(git2::BranchType::Local))?;
+    for br in branches {
+        let (branch, _) = br?;
+        if let Some(t) = branch.get().target() {
+            if t == head_oid {
+                let rn = branch.get().name().unwrap_or("").to_string();
+                if !rn.is_empty() {
+                    repo.reference(&rn, cur, true, "Delete commit: update branch")?;
+                }
+            }
+        }
+    }
+    if let Some(ref_name) = branch_name {
+        repo.set_head(&ref_name)?;
+    } else {
+        repo.set_head_detached(cur)?;
+    }
+
+    println!("[GitService] Commit deleted via rebase.");
+    Ok(())
+}

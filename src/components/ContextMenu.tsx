@@ -9,6 +9,7 @@ export interface ContextMenuProps {
     commitSha: string;
     onClose: () => void;
     onResetHard: (sha: string) => void;
+    onDeleteCommit: (sha: string) => void;
     onAmendMessage: (sha: string) => void;
 }
 
@@ -18,11 +19,11 @@ export function ContextMenu({
     commitSha,
     onClose,
     onResetHard,
+    onDeleteCommit,
     onAmendMessage,
 }: ContextMenuProps) {
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // Close on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -33,7 +34,6 @@ export function ContextMenu({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [onClose]);
 
-    // Close on Escape
     useEffect(() => {
         function handleKeyDown(event: KeyboardEvent) {
             if (event.key === "Escape") {
@@ -48,10 +48,7 @@ export function ContextMenu({
         <div
             ref={menuRef}
             className="context-menu"
-            style={{
-                top: y,
-                left: x,
-            }}
+            style={{ top: y, left: x }}
         >
             <div className="context-menu__header">
                 存档: <span className="context-menu__sha">{commitSha}</span>
@@ -59,10 +56,7 @@ export function ContextMenu({
 
             <button
                 className="context-menu__item"
-                onClick={() => {
-                    onResetHard(commitSha);
-                    onClose();
-                }}
+                onClick={() => { onResetHard(commitSha); onClose(); }}
             >
                 <span className="context-menu__icon">⚠️</span>
                 <span>恢复并删除后续存档</span>
@@ -70,10 +64,15 @@ export function ContextMenu({
 
             <button
                 className="context-menu__item"
-                onClick={() => {
-                    onAmendMessage(commitSha);
-                    onClose();
-                }}
+                onClick={() => { onDeleteCommit(commitSha); onClose(); }}
+            >
+                <span className="context-menu__icon">🗑️</span>
+                <span>删除此存档</span>
+            </button>
+
+            <button
+                className="context-menu__item"
+                onClick={() => { onAmendMessage(commitSha); onClose(); }}
             >
                 <span className="context-menu__icon">✏️</span>
                 <span>修改说明</span>

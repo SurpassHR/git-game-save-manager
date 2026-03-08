@@ -19,7 +19,7 @@ import { useAppStore } from "../store";
 import { useCommitGraph } from "../hooks/useCommitGraph";
 import { CommitNode } from "../components/CommitNode";
 import { CommitDetailPanel } from "../components/CommitDetailPanel";
-import { resetHard, amendCommit } from "../services/gitService";
+import { resetHard, amendCommit, deleteCommit } from "../services/gitService";
 import * as gitService from "../services/gitService";
 import { ask, message } from "@tauri-apps/plugin-dialog";
 import { ContextMenu } from "../components/ContextMenu";
@@ -142,6 +142,23 @@ export function CommitGraphPage() {
         }
     };
 
+    const handleDeleteCommit = async (sha: string) => {
+        if (!activeProfile) return;
+        const confirmed = await ask(
+            `警告：这将从历史中永久删除存档 ${sha}，此操作不可逆。确定要继续吗？`,
+            { title: "删除存档", kind: "warning" }
+        );
+        if (confirmed) {
+            try {
+                await deleteCommit(activeProfile.repo_path, sha);
+                await loadCommits();
+            } catch (err) {
+                console.error("Failed to delete commit:", err);
+                await message(String(err), { title: "删除存档失败", kind: "error" });
+            }
+        }
+    };
+
     const handleAmendMessage = (sha: string) => {
         if (!activeProfile) return;
         const currentMessage = commits.find((c) => c.hex_sha === sha)?.message || "";
@@ -152,14 +169,25 @@ export function CommitGraphPage() {
         const { sha, currentMessage } = promptModal;
         setPromptModal((p) => ({ ...p, isOpen: false }));
 
+        console.log("[Amend Debug] sha:", sha);
+        console.log("[Amend Debug] newMessage:", JSON.stringify(newMessage));
+        console.log("[Amend Debug] currentMessage:", JSON.stringify(currentMessage));
+        console.log("[Amend Debug] activeProfile:", !!activeProfile);
+        console.log("[Amend Debug] condition:", newMessage && newMessage !== currentMessage && !!activeProfile);
+
         if (newMessage && newMessage !== currentMessage && activeProfile) {
             try {
+                console.log("[Amend Debug] Calling amendCommit...");
                 await amendCommit(activeProfile.repo_path, sha, newMessage);
+                console.log("[Amend Debug] amendCommit returned. Calling loadCommits...");
                 await loadCommits();
+                console.log("[Amend Debug] loadCommits returned.");
             } catch (err) {
                 console.error("Failed to amend commit:", err);
                 await message(String(err), { title: "修改说明失败", kind: "error" });
             }
+        } else {
+            console.warn("[Amend Debug] Skipped! Condition was false.");
         }
     };
 
@@ -248,6 +276,7 @@ export function CommitGraphPage() {
                     commitSha={contextMenu.commitSha}
                     onClose={() => setContextMenu(null)}
                     onResetHard={handleResetHard}
+                    onDeleteCommit={handleDeleteCommit}
                     onAmendMessage={handleAmendMessage}
                 />
             )}

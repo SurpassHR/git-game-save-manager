@@ -65,3 +65,13 @@ export async function amendCommit(
 ): Promise<string> {
     return invoke<string>("amend_commit", { repoPath, commitSha, newMessage });
 }
+
+/**
+ * Delete a specific commit from history (rebases descendants onto parent)
+ */
+export async function deleteCommit(
+    repoPath: string,
+    commitSha: string
+): Promise<void> {
+    return invoke<void>("delete_commit", { repoPath, commitSha });
+}
